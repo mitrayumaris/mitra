@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Portal Configuration
+    match /portalConfig/{configId} {
+      allow read, write: if true;
+    }
+
+    // Products Collection
+    match /products/{productId} {
+      allow read, write: if true;
+    }
+
+    // Accounts Collection
+    match /accounts/{accountId} {
+      allow read: if true; // Needed to resolve referrals on checkout
+      allow write: if true; // Allow signups & state updates
+    }
+
+    // Transactions Collection
+    match /transactions/{transactionId} {
+      allow read, write: if true; // Accessible for everyone to register and view
+    }
+
+    // Withdrawals Collection
+    match /withdrawals/{withdrawalId} {
+      allow read, write: if true; // Standard tracking
+    }
+
+    // Tahfidz progress log Collection
+    match /tahfidzProgress/{partnerId} {
+      allow read, write: if true; // Let partners update programatically
+    }
+  }
+}

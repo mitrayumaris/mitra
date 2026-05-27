@@ -1,0 +1,6 @@
+{
+  "name": "Mitra Yumaris",
+  "description": "Multi-level affiliate portal dengan otomatisasi komisi kemitraan Tahfidz Coding terintegrasi Firebase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

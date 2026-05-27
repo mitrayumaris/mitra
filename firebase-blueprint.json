@@ -1,0 +1,124 @@
+{
+  "entities": {
+    "Account": {
+      "title": "Account",
+      "description": "User or partner account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "level": { "type": "string" },
+        "parentId": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "commissionPercent": { "type": "number" }
+      },
+      "required": ["id", "name", "username", "phone", "address", "level", "referralCode", "commissionPercent"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Offered academic programs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "imageSrc": { "type": "string" },
+        "regFee": { "type": "number" },
+        "monthlyFee": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "imageSrc", "regFee", "monthlyFee", "description"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "New student registration and commission distribution",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "buyerPhone": { "type": "string" },
+        "buyerAddress": { "type": "string" },
+        "products": { "type": "array" },
+        "totalPrice": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "payableAmount": { "type": "number" },
+        "referralCodeUsed": { "type": "string" },
+        "referrerId": { "type": "string" },
+        "commissions": { "type": "array" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "buyerName", "buyerPhone", "buyerAddress", "products", "totalPrice", "discountAmount", "payableAmount", "status", "createdAt"]
+    },
+    "WithdrawalRequest": {
+      "title": "WithdrawalRequest",
+      "description": "Withdrawal of commissions by partners",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "requesterId": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "requesterLevel": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "proofImage": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "completedAt": { "type": "string" }
+      },
+      "required": ["id", "requesterId", "requesterName", "requesterLevel", "amount", "status", "createdAt"]
+    },
+    "TahfidzProgress": {
+      "title": "TahfidzProgress",
+      "description": "Quranic memorization updates and progress log",
+      "type": "object",
+      "properties": {
+        "partnerId": { "type": "string" },
+        "totalSurahs": { "type": "number" },
+        "totalJuz": { "type": "number" },
+        "lastUpdated": { "type": "string" },
+        "logs": { "type": "array" }
+      },
+      "required": ["partnerId", "totalSurahs", "totalJuz", "lastUpdated", "logs"]
+    },
+    "PortalConfig": {
+      "title": "PortalConfig",
+      "description": "Visual customization settings",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string" },
+        "bannerUrls": { "type": "array" }
+      },
+      "required": ["logoUrl", "bannerUrls"]
+    }
+  },
+  "firestore": {
+    "/accounts/{accountId}": {
+      "schema": "Account",
+      "description": "Partner and admin accounts"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Academic educational packages"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User registrations and generated commissions"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "WithdrawalRequest",
+      "description": "Requests for payouts"
+    },
+    "/tahfidzProgress/{partnerId}": {
+      "schema": "TahfidzProgress",
+      "description": "Tahfidz logs details per partner"
+    },
+    "/portalConfig/{configId}": {
+      "schema": "PortalConfig",
+      "description": "Dynamic layout logo and banner URLs"
+    }
+  }
+}
