@@ -60,12 +60,14 @@ export default function App() {
 
   // Real-time remote storage version counter
   const [dbVersion, setDbVersion] = useState(0);
+  const [isDataReady, setIsDataReady] = useState(DataService.isReady());
 
   // Initialize Firebase listeners and local reactive updates
   useEffect(() => {
     initializeFirebaseSync();
     const unsubscribe = registerDataListener(() => {
       setDbVersion(prev => prev + 1);
+      setIsDataReady(DataService.isReady());
     });
     return () => unsubscribe();
   }, []);
@@ -217,6 +219,35 @@ export default function App() {
     setPasswordInput(user.pass);
     setLoginError('');
   };
+
+  if (!isDataReady) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
+        <div className="flex flex-col items-center space-y-6 max-w-sm text-center">
+          {/* Pulsing beautiful logo ring */}
+          <div className="relative flex items-center justify-center">
+            <div className="absolute w-20 h-20 bg-[#135d47]/10 rounded-3xl animate-ping opacity-75"></div>
+            <div className="w-16 h-16 bg-[#135d47] rounded-2xl flex items-center justify-center shadow-lg border border-[#d97706]/30 relative z-10">
+              <GraduationCap className="w-9 h-9 text-[#fbbf24] animate-pulse" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="font-extrabold text-[#135d47] text-lg tracking-tight">Yumaris Madani Indonesia</h3>
+            <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">Menghubungkan ke basis data portal. Sinyal aman...</p>
+          </div>
+          {/* Simple sleek progress bar */}
+          <div className="w-36 h-1 bg-slate-200 rounded-full overflow-hidden relative">
+            <motion.div 
+              className="absolute h-full bg-[#135d47] rounded-full"
+              initial={{ left: '-50%', width: '40%' }}
+              animate={{ left: '110%' }}
+              transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative">

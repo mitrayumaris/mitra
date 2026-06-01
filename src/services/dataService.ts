@@ -282,18 +282,37 @@ const KEYS = {
   CONFIG: 'tcs_config',
 };
 
-// Memory Cache Layers
-let cacheProducts: Product[] = [];
-let cacheAccounts: Account[] = [];
-let cacheTransactions: Transaction[] = [];
-let cacheWithdrawals: WithdrawalRequest[] = [];
-let cacheTahfidzProgress: TahfidzProgress[] = [];
-let cachePortalConfig: PortalConfig = DEFAULT_CONFIG;
+// Access helpers for LocalStorage (Fallback / Immediate response)
+function getStored<T>(key: string, fallback: T): T {
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
-let isProductsLoaded = false;
-let isAccountsLoaded = false;
-let isTransactionsLoaded = false;
-let isWithdrawalsLoaded = false;
+function setStored<T>(key: string, val: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch (e) {
+    console.error(`Error saving key ${key}`, e);
+  }
+}
+
+// Memory Cache Layers (Pre-loaded from local storage synchronously on load to prevent any flash of template defaults)
+let cacheProducts: Product[] = getStored<Product[]>(KEYS.PRODUCTS, DEFAULT_PRODUCTS);
+let cacheAccounts: Account[] = getStored<Account[]>(KEYS.ACCOUNTS, DEFAULT_ACCOUNTS);
+let cacheTransactions: Transaction[] = getStored<Transaction[]>(KEYS.TRANSACTIONS, DEFAULT_TRANSACTIONS);
+let cacheWithdrawals: WithdrawalRequest[] = getStored<WithdrawalRequest[]>(KEYS.WITHDRAWALS, DEFAULT_WITHDRAWALS);
+let cacheTahfidzProgress: TahfidzProgress[] = getStored<TahfidzProgress[]>(KEYS.TAHFIDZ, DEFAULT_TAHFIDZ);
+let cachePortalConfig: PortalConfig = getStored<PortalConfig>(KEYS.CONFIG, DEFAULT_CONFIG);
+
+let isProductsLoaded = localStorage.getItem(KEYS.PRODUCTS) !== null;
+let isAccountsLoaded = localStorage.getItem(KEYS.ACCOUNTS) !== null;
+let isTransactionsLoaded = localStorage.getItem(KEYS.TRANSACTIONS) !== null;
+let isWithdrawalsLoaded = localStorage.getItem(KEYS.WITHDRAWALS) !== null;
+let isConfigLoaded = localStorage.getItem(KEYS.CONFIG) !== null;
 
 // Listeners to trigger UI re-renders on remote Firestore updates
 const dataListeners: (() => void)[] = [];
@@ -316,24 +335,6 @@ const notifyListeners = () => {
   });
 };
 
-// Access helpers for LocalStorage (Fallback / Immediate response)
-function getStored<T>(key: string, fallback: T): T {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function setStored<T>(key: string, val: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch (e) {
-    console.error(`Error saving key ${key}`, e);
-  }
-}
-
 // Global initialization of Real-Time Firebase Subscriptions
 export const initializeFirebaseSync = async () => {
   console.log("Initializing Firebase Sync listeners...");
@@ -350,6 +351,7 @@ export const initializeFirebaseSync = async () => {
           await setDoc(doc(db, 'portalConfig', 'main'), DEFAULT_CONFIG);
           cachePortalConfig = DEFAULT_CONFIG;
         }
+        isConfigLoaded = true;
         notifyListeners();
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, 'portalConfig/main');
@@ -552,11 +554,15 @@ export const initializeFirebaseSync = async () => {
 };
 
 export const DataService = {
+  isReady(): boolean {
+    return isProductsLoaded && isConfigLoaded;
+  },
+
   // ----------------------------------------------------
   // CONFIG LOGO & BANNERS
   // ----------------------------------------------------
   getConfig(): PortalConfig {
-    return cachePortalConfig || getStored<PortalConfig>(KEYS.CONFIG, DEFAULT_CONFIG);
+    return cachePortalConfig;
   },
 
   async saveConfig(config: PortalConfig): Promise<void> {
@@ -574,11 +580,6 @@ export const DataService = {
   // PRODUCTS
   // ----------------------------------------------------
   getProducts(): Product[] {
-    if (!isProductsLoaded && cacheProducts.length === 0) {
-      const stored = getStored<Product[]>(KEYS.PRODUCTS, []);
-      cacheProducts = stored.length > 0 ? stored : DEFAULT_PRODUCTS;
-      isProductsLoaded = true;
-    }
     return [...cacheProducts].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   },
 
@@ -625,11 +626,6 @@ export const DataService = {
   // ACCOUNTS & RELATIONSHIPS
   // ----------------------------------------------------
   getAccounts(): Account[] {
-    if (!isAccountsLoaded && cacheAccounts.length === 0) {
-      const stored = getStored<Account[]>(KEYS.ACCOUNTS, []);
-      cacheAccounts = stored.length > 0 ? stored : DEFAULT_ACCOUNTS;
-      isAccountsLoaded = true;
-    }
     return cacheAccounts;
   },
 
