@@ -687,7 +687,7 @@ export const DataService = {
     buyerName: string;
     buyerPhone: string;
     buyerAddress: string;
-    products: Product[];
+    products: (Product & { quantity?: number })[];
     referralCode?: string;
   }): Promise<Transaction> {
     const accounts = this.getAccounts();
@@ -696,15 +696,17 @@ export const DataService = {
     // 1. Calculate price variables
     let totalPrice = 0;
     const detailProducts = data.products.map(p => {
+      const q = p.quantity || 1;
       const admission = p.admissionFee || 0;
-      totalPrice += admission + p.regFee + p.monthlyFee;
+      totalPrice += (admission + p.regFee + p.monthlyFee) * q;
       return {
         productId: p.id,
         productName: p.name,
         admissionFee: admission,
         regFee: p.regFee,
         monthlyFee: p.monthlyFee,
-        referralDiscount: p.referralDiscount || 0
+        referralDiscount: p.referralDiscount || 0,
+        quantity: q
       };
     });
 
@@ -718,8 +720,8 @@ export const DataService = {
       referrerAccount = accounts.find(a => a.referralCode.toUpperCase() === codeCleaned);
       if (referrerAccount) {
         referrerId = referrerAccount.id;
-        // Compute discount based on product's referralDiscount input by admin
-        discountAmount = data.products.reduce((acc, p) => acc + (p.referralDiscount || 0), 0);
+        // Compute discount based on product's referralDiscount and quantity
+        discountAmount = data.products.reduce((acc, p) => acc + (p.referralDiscount || 0) * (p.quantity || 1), 0);
       }
     }
 
@@ -732,11 +734,17 @@ export const DataService = {
       // Build the upward referral chain (e.g. [Agen, Sub-Mitra, Mitra])
       const chain: Account[] = [];
       let current: Account | undefined = referrerAccount;
+      const visited = new Set<string>();
       while (current) {
+        if (visited.has(current.id)) {
+          console.warn("Circular reference detected in referral chain:", current.id);
+          break;
+        }
+        visited.add(current.id);
         if (current.level !== 'admin') {
           chain.push(current);
         }
-        if (current.parentId) {
+        if (current.parentId && current.parentId !== current.id) {
           current = accounts.find(a => a.id === current?.parentId);
         } else {
           current = undefined;

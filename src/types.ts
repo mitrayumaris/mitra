@@ -57,6 +57,7 @@ export interface Transaction {
     regFee: number;
     monthlyFee: number;
     referralDiscount?: number;
+    quantity?: number;
   }[];
   totalPrice: number; // Sum of regFee + monthlyFee across products
   discountAmount: number; // Referral code discount amount

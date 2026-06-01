@@ -18,12 +18,16 @@ import {
   Copy, 
   Check, 
   ChevronRight, 
+  ChevronLeft,
   Calendar,
   Layers,
   Heart,
-  BookOpenCheck
+  BookOpenCheck,
+  X,
+  Minus,
+  BookMarked
 } from 'lucide-react';
-import { DataService } from '../services/dataService';
+import { DataService, registerDataListener } from '../services/dataService';
 import { Account, Product, Transaction, WithdrawalRequest, TahfidzProgress } from '../types';
 import { getDirectDriveUrl } from '../utils/drive';
 
@@ -43,13 +47,58 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
   // Copy referral status
   const [copied, setCopied] = useState(false);
 
-  // Local Form state - customer purchase
-  const [selectedProdIds, setSelectedProdIds] = useState<string[]>([]);
+  // Checkout State
+  const [cart, setCart] = useState<(Product & { quantity: number })[]>([]);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
+
   const [custName, setCustName] = useState('');
   const [custPhone, setCustPhone] = useState('');
   const [custAddr, setCustAddr] = useState('');
   const [isBuying, setIsBuying] = useState(false);
   const [buySuccess, setBuySuccess] = useState(false);
+
+  const categories = ['Semua', ...Array.from(new Set(products.map(p => p.category)))];
+
+  const getProductQuantity = (productId: string) => {
+    return quantities[productId] || 1;
+  };
+
+  const updateProductQuantity = (productId: string, val: number) => {
+    const newVal = Math.max(1, val);
+    setQuantities(prev => ({
+      ...prev,
+      [productId]: newVal
+    }));
+    
+    // Also update cart quantity if it's already in the cart!
+    setCart(prev => prev.map(item => 
+      item.id === productId ? { ...item, quantity: newVal } : item
+    ));
+  };
+
+  const toggleCartItem = (product: Product) => {
+    setCart(prev => {
+      const exists = prev.some(item => item.id === product.id);
+      if (exists) {
+        return prev.filter(item => item.id !== product.id);
+      } else {
+        // Automatically open checkout drawer to make a transaction
+        setIsCheckoutOpen(true);
+        const qty = getProductQuantity(product.id);
+        return [...prev, { ...product, quantity: qty }];
+      }
+    });
+  };
+
+  const toggleDescription = (id: string) => {
+    setExpandedProducts(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   // Local Form state - Withdraw command
   const [wdAmount, setWdAmount] = useState<number>(0);
@@ -63,6 +112,10 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
 
   useEffect(() => {
     refreshDashboardData();
+    const unsubscribe = registerDataListener(() => {
+      refreshDashboardData();
+    });
+    return () => unsubscribe();
   }, [partner.id]);
 
   // Copy referral link to clipboard
@@ -77,34 +130,33 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
   // Submit purchase as referral owner
   const handleDirectPurchase = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedProdIds.length === 0 || !custName || !custPhone || !custAddr) {
+    if (cart.length === 0 || !custName || !custPhone || !custAddr) {
       alert('Mohon isi semua data pembeli dan pilih minimal 1 program!');
       return;
     }
 
     setIsBuying(true);
 
-    const productsToBuy = products.filter(p => selectedProdIds.includes(p.id));
-
     setTimeout(() => {
       DataService.createTransaction({
         buyerName: custName,
         buyerPhone: custPhone,
         buyerAddress: custAddr,
-        products: productsToBuy,
+        products: cart,
         // Placing partner's referral code automatically to direct cash splits to network
         referralCode: partner.referralCode
       });
 
       setIsBuying(false);
       setBuySuccess(true);
-      setSelectedProdIds([]);
+      setCart([]);
       setCustName('');
       setCustPhone('');
       setCustAddr('');
+      setIsCheckoutOpen(false);
       refreshDashboardData();
 
-      setTimeout(() => setBuySuccess(false), 4000);
+      setTimeout(() => setBuySuccess(false), 4500);
     }, 1200);
   };
 
@@ -127,12 +179,6 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
     refreshDashboardData();
 
     setTimeout(() => setWdSuccess(false), 4000);
-  };
-
-  const handleProductCheckbox = (id: string) => {
-    setSelectedProdIds(prev => 
-      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
-    );
   };
 
   const formatPrice = (value: number) => {
@@ -190,6 +236,20 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
             Laporan Kemitraan
           </button>
 
+          {cart.length > 0 && (
+            <button
+              onClick={() => setIsCheckoutOpen(true)}
+              className="relative inline-flex items-center justify-center p-2 rounded-xl bg-brand-yellow hover:bg-yellow-500 text-brand-green font-extrabold transition-all cursor-pointer shadow-sm"
+              id="partner-cart-btn"
+              title="Keranjang Pendaftaran"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-black animate-bounce shadow">
+                {cart.length}
+              </span>
+            </button>
+          )}
+
           <button 
             onClick={onLogout}
             className="px-3.5 py-2 bg-white/10 hover:bg-white/15 hover:text-red-300 border border-white/20 rounded-xl text-[11px] sm:text-xs font-bold text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
@@ -202,172 +262,179 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
       {/* Main Body content */}
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 md:px-8 py-10" id="partner-view">
         {activeTab === 'products' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Column 1: Referral Link setup & Direct Buy Form */}
-            <div className="space-y-6 lg:col-span-1">
-              {/* Box 1: Referral Link */}
-              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <h4 className="font-bold text-slate-900 text-sm">Link Referral Anda</h4>
-                  <span className="text-xs font-mono font-bold text-brand-green bg-brand-green/10 px-2 py-0.5 rounded border border-brand-green/20">{partner.referralCode}</span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">Sebarkan link atau kode referral milik Anda. Pendaftar baru yang bertransaksi akan otomatis diskon 10% dan komisi akan dialirkan langsung ke saldo dompet Anda.</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleCopyLink}
-                    className="flex-grow inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl border border-slate-200 hover:border-brand-green text-slate-700 hover:text-brand-green font-bold text-xs bg-slate-50 hover:bg-white transition-all cursor-pointer shadow-sm"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-brand-green" /> Tersalin!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" /> Salin Link Referral
-                      </>
-                    )}
-                  </button>
-                </div>
+          <div className="space-y-6">
+            {/* Box 1: Referral Link banner */}
+            <div className="bg-gradient-to-r from-brand-green to-teal-850 text-white rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+              <div className="absolute right-0 bottom-0 translate-x-12 translate-y-12 text-white/5 pointer-events-none">
+                <Sparkles className="w-48 h-48" />
               </div>
-
-              {/* Box 2: Direct Buy Form */}
-              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
-                <div className="border-b border-slate-100 pb-3">
-                  <h4 className="font-bold text-slate-900 text-sm">Daftarkan Konsumen (Daftar Cepat)</h4>
-                  <p className="text-xs text-slate-550 mt-0.5 font-medium text-slate-450">Punya calon santri? Input langsung data mereka untuk mendaftar.</p>
+              <div className="relative z-10 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="font-extrabold text-white text-base md:text-lg">Tingkatkan Syiar Bersama Link Afiliasi Anda</h4>
+                  <span className="text-xs font-mono font-black text-brand-green bg-brand-yellow px-2.5 py-0.5 rounded shadow-sm">{partner.referralCode}</span>
                 </div>
-
-                {buySuccess && (
-                  <div className="p-3.5 bg-brand-green/10 border border-brand-green/15 rounded-xl flex items-center gap-2.5 text-xs text-brand-green">
-                    <CheckCircle className="w-5 h-5 shrink-0 text-brand-green" />
-                    <p>Siswa sukses didaftarkan! Status pendaftaran akan menunggu verifikasi pembayaran di Admin Pusat.</p>
-                  </div>
+                <p className="text-xs text-slate-100 leading-relaxed max-w-2xl">Bagikan link atau kode referral Anda ini kepada masyarakat. Setiap pendaftar baru otomatis mendapatkan diskon 10% dan komisi pembagian hasil berjenjang akan langsung masuk ke dompet Anda secara syariah.</p>
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className="relative z-10 shrink-0 inline-flex items-center justify-center gap-1.5 py-3 px-5 rounded-xl text-brand-green font-black text-xs bg-brand-yellow hover:bg-yellow-400 transition-all cursor-pointer shadow-md self-start md:self-auto"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 text-brand-green" /> Tersalin!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" /> Salin Link Referral
+                  </>
                 )}
+              </button>
+            </div>
 
-                <form onSubmit={handleDirectPurchase} className="space-y-4">
-                  {/* Select program checkboxes */}
-                  <div className="space-y-2">
-                    <span className="text-xs font-bold text-slate-450 uppercase block">Pilih Kelas Akademik</span>
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-3 bg-slate-50/50">
-                      {products.map(p => (
-                        <label key={p.id} className="flex items-start gap-2.5 p-1.5 cursor-pointer hover:bg-white rounded hover:shadow-xs transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={selectedProdIds.includes(p.id)}
-                            onChange={() => handleProductCheckbox(p.id)}
-                            className="mt-1 h-3.5 w-3.5 rounded text-brand-green focus:ring-brand-green focus:border-brand-green"
-                          />
-                          <div className="text-xs">
-                            <p className="font-bold text-slate-800">{p.name}</p>
-                            <p className="text-slate-400">Pangkal: {formatPrice(p.admissionFee || 0)} | Reg: {formatPrice(p.regFee)} | SPP: {formatPrice(p.monthlyFee)}</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+            {/* Toolbar with Categories */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm animate-fade-in">
+              <div>
+                <h3 className="text-lg md:text-xl font-black text-slate-900 leading-none">Katalog Program Akademik &amp; Syiar</h3>
+                <p className="text-xs text-slate-500 mt-1.5">Setiap santri baru yang didaftarkan dari dashboard ini otomatis terikat dengan referral Anda <strong className="font-mono text-brand-green">{partner.referralCode}</strong>.</p>
+              </div>
 
-                  {/* Customer information */}
-                  <div className="space-y-3">
-                    <div className="space-y-0.5">
-                      <span className="text-[11px] font-semibold text-slate-600">Nama Lengkap Siswa</span>
-                      <input
-                        required
-                        type="text"
-                        value={custName}
-                        onChange={e => setCustName(e.target.value)}
-                        placeholder="Nama Lengkap"
-                        className="w-full px-3 py-2 border border-slate-200 bg-white text-slate-800 text-xs rounded-xl outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/20"
-                      />
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <span className="text-[11px] font-semibold text-slate-600">Nomor HP / WA</span>
-                      <input
-                        required
-                        type="text"
-                        value={custPhone}
-                        onChange={e => setCustPhone(e.target.value)}
-                        placeholder="0812345..."
-                        className="w-full px-3 py-2 border border-slate-200 bg-white text-slate-800 text-xs rounded-xl outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/20"
-                      />
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <span className="text-[11px] font-semibold text-slate-600">Alamat Domisili</span>
-                      <textarea
-                        required
-                        rows={2}
-                        value={custAddr}
-                        onChange={e => setCustAddr(e.target.value)}
-                        placeholder="Alamat Lengkap"
-                        className="w-full px-3 py-2 border border-slate-200 bg-white text-slate-800 text-xs rounded-xl outline-none resize-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/20"
-                      ></textarea>
-                    </div>
-                  </div>
-
+              <div className="flex flex-wrap gap-1.5 pt-2">
+                {categories.map(cat => (
                   <button
-                    type="submit"
-                    disabled={isBuying || selectedProdIds.length === 0}
-                    className="w-full py-2.5 bg-brand-green hover:bg-brand-green/95 disabled:bg-slate-350 text-white font-bold text-xs rounded-xl shadow cursor-pointer transition-colors"
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black tracking-wide transition-all cursor-pointer ${
+                      selectedCategory === cat 
+                        ? 'bg-brand-green text-white shadow-md shadow-brand-green/10' 
+                        : 'bg-slate-50 text-slate-600 border border-slate-200 hover:border-slate-350 hover:bg-slate-100'
+                    }`}
                   >
-                    {isBuying ? 'Mendaftarkan...' : 'Kirim Pendaftaran Siswa'}
+                    {cat}
                   </button>
-                </form>
+                ))}
               </div>
             </div>
 
-            {/* Column 2: Educational Programs Catalog grid */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">Katalog Program &amp; Lembaga</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  {products.map(prod => (
-                    <div key={prod.id} className="border border-slate-150 rounded-2xl overflow-hidden hover:border-brand-green/25 transition-all flex flex-col h-full bg-slate-50/20 group">
-                      <div className="h-40 bg-slate-100 relative">
-                        <img 
-                          src={getDirectDriveUrl(prod.imageSrc)} 
-                          alt="class" 
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-350"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                          }}
-                        />
-                        <span className="absolute top-2 left-2 bg-brand-green text-white text-[9px] font-bold py-0.5 px-2 rounded tracking-wider uppercase">
-                          {prod.category}
-                        </span>
-                      </div>
-                      <div className="p-4 flex-grow flex flex-col justify-between">
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-sm leading-snug group-hover:text-brand-green transition-colors">{prod.name}</h4>
-                          <p className="text-slate-500 text-xs mt-1 line-clamp-2 leading-relaxed">{prod.description}</p>
-                        </div>
-                        
-                        <div className="border-t border-slate-100 pt-3.5 mt-4 space-y-1 text-xs font-semibold">
-                          <div className="flex justify-between">
-                            <span className="text-slate-450 font-medium text-brand-green">Uang Pangkal</span>
-                            <span className="font-extrabold text-slate-900">{formatPrice(prod.admissionFee || 0)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-450 font-medium">Registrasi Mandiri</span>
-                            <span className="font-bold text-slate-800">{formatPrice(prod.regFee)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-450 font-medium">Bimbingan Bulanan (SPP)</span>
-                            <span className="font-bold text-slate-950">{formatPrice(prod.monthlyFee)}</span>
-                          </div>
-                          <div className="flex justify-between text-rose-500 font-medium">
-                            <span className="text-slate-450 font-medium">Potongan Referral</span>
-                            <span className="font-bold text-rose-600">-{formatPrice(prod.referralDiscount || 0)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {/* Program Catalog Grid (Landing-Page Style) */}
+            {products.filter(p => selectedCategory === 'Semua' || p.category === selectedCategory).length === 0 ? (
+              <div className="bg-white rounded-3xl p-12 text-center border border-slate-200">
+                <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500">Belum ada program akademik pada kategori ini.</p>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {products
+                  .filter(p => selectedCategory === 'Semua' || p.category === selectedCategory)
+                  .map(product => {
+                    const inCart = cart.some(p => p.id === product.id);
+                    return (
+                      <div 
+                        key={product.id}
+                        className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-xl hover:border-brand-green/20 transition-all duration-300 flex flex-col group h-full"
+                      >
+                        <div className="relative h-56 overflow-hidden bg-slate-100">
+                          <img 
+                            src={getDirectDriveUrl(product.imageSrc)} 
+                            alt={product.name}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+                            }}
+                          />
+                          <span className="absolute top-2 left-2 bg-brand-green text-white text-[9px] font-bold py-0.5 px-2 rounded tracking-wider uppercase z-10">
+                            {product.category}
+                          </span>
+                        </div>
+
+                        <div className="p-6 flex-grow flex flex-col">
+                          <h4 className="font-bold text-lg text-slate-900 leading-snug group-hover:text-brand-green transition-colors mb-2">
+                            {product.name}
+                          </h4>
+                          <div className="flex-grow flex flex-col justify-between mb-4">
+                            <p className={`text-slate-500 text-sm leading-relaxed ${expandedProducts[product.id] ? '' : 'line-clamp-3'}`}>
+                              {product.description}
+                            </p>
+                            <button
+                              onClick={() => toggleDescription(product.id)}
+                              className="text-brand-green hover:text-brand-green/80 text-xs font-bold tracking-wide mt-2 self-start flex items-center gap-1 transition-all focus:outline-none cursor-pointer"
+                            >
+                              {expandedProducts[product.id] ? 'Sembunyikan Rincian ▲' : 'Lihat Selengkapnya ▼'}
+                            </button>
+                          </div>
+
+                          <div className="space-y-2 border-t border-slate-100 pt-4 mb-4">
+                            <div className="flex justify-between items-center text-sm font-semibold">
+                              <span className="text-slate-450 font-semibold text-brand-green">Uang Pangkal</span>
+                              <span className="font-extrabold text-slate-900">{formatPrice(product.admissionFee || 0)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm font-semibold">
+                              <span className="text-slate-450 font-medium">Biaya Registrasi</span>
+                              <span className="font-bold text-slate-800">{formatPrice(product.regFee)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm font-semibold">
+                              <span className="text-slate-450 font-medium">Iuran Bulanan (SPP)</span>
+                              <span className="font-bold text-slate-950">{formatPrice(product.monthlyFee)} <span className="text-xs text-slate-400 font-normal">/ bln</span></span>
+                            </div>
+                          </div>
+
+                          {/* Jumlah Peserta Selector */}
+                          <div className="flex items-center justify-between bg-slate-50 border border-slate-150 p-3 rounded-2xl mb-4 text-xs font-semibold">
+                            <span className="text-slate-600 flex items-center gap-1">
+                              <User className="w-3.5 h-3.5 text-slate-400" /> Jml Peserta/Santri:
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => updateProductQuantity(product.id, getProductQuantity(product.id) - 1)}
+                                className="w-7 h-7 flex items-center justify-center bg-white border border-slate-250 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-sm font-bold shadow-2xs"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={getProductQuantity(product.id)}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 1;
+                                  updateProductQuantity(product.id, val);
+                                }}
+                                className="w-8 text-center font-bold text-slate-900 bg-transparent outline-none text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => updateProductQuantity(product.id, getProductQuantity(product.id) + 1)}
+                                className="w-7 h-7 flex items-center justify-center bg-white border border-slate-250 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-sm font-bold shadow-2xs"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => toggleCartItem(product)}
+                            className={`w-full py-3 px-4 rounded-xl font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+                              inCart 
+                                ? 'bg-brand-yellow hover:bg-yellow-500 text-brand-green font-black shadow-md' 
+                                : 'bg-brand-green hover:bg-brand-green/90 text-white hover:shadow-lg'
+                            }`}
+                          >
+                            {inCart ? (
+                              <>
+                                <X className="w-4 h-4" /> Batalkan Pendaftaran
+                              </>
+                            ) : (
+                              <>
+                                <BookMarked className="w-4 h-4" /> Daftar Program Ini
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -593,7 +660,7 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
                                 <p className="text-[10px] text-slate-400 font-mono mt-0.5">{tx.buyerPhone}</p>
                               </td>
                               <td className="py-3.5 px-4 font-semibold text-slate-650 max-w-44 truncate">
-                                {tx.products.map(p => p.productName).join(', ')}
+                                {tx.products.map(p => p.productName + (p.quantity && p.quantity > 1 ? ` (${p.quantity} Peserta)` : '')).join(', ')}
                               </td>
                               <td className="py-3.5 px-4 font-mono text-slate-500">
                                 {new Date(tx.createdAt).toLocaleDateString('id-ID', {
@@ -630,6 +697,200 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
           </div>
         )}
       </main>
+
+      {/* Checkout Side Draw / Modal */}
+      <AnimatePresence>
+        {isCheckoutOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end" id="partner-checkout-modal-backdrop">
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCheckoutOpen(false)}
+              className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs"
+            ></motion.div>
+
+            {/* Content panel */}
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col z-10"
+              id="partner-checkout-modal-panel"
+            >
+              {/* Header */}
+              <div className="h-20 border-b border-brand-yellow/15 px-6 flex items-center justify-between bg-brand-green text-white">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-brand-yellow text-brand-green rounded-lg">
+                    <ShoppingBag className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white">Formulir Pendaftaran Siswa</h4>
+                    <p className="text-xs text-slate-350">Daftarkan santri baru melalui program afiliasi Anda</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsCheckoutOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-350 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <div className="flex-grow overflow-y-auto p-6 space-y-8">
+                {buySuccess && (
+                  <div className="p-3.5 bg-brand-green/10 border border-brand-green/15 rounded-xl flex items-center gap-2.5 text-xs text-brand-green animate-bounce">
+                    <CheckCircle className="w-5 h-5 shrink-0 text-brand-green" />
+                    <div>
+                      <h5 className="font-bold">Siswa Berhasil Didaftarkan!</h5>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600 font-medium">Pendaftaran santri baru berhasil terekam. Tagihan akan diproses, dan pembagian komisi afiliasi berjenjang Anda akan menunggu verifikasi pembayaran di pusat.</p>
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleDirectPurchase} className="space-y-6">
+                  {/* Selected Programs */}
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-slate-450 uppercase tracking-wider block">Program Yang Dipilih</label>
+                    <div className="space-y-3">
+                      {cart.map(p => (
+                        <div key={p.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-150 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="max-w-[75%]">
+                              <p className="font-bold text-sm text-slate-950 truncate">{p.name}</p>
+                              <p className="text-xs text-slate-400 mt-0.5 font-medium">{p.category}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleCartItem(p)}
+                              className="text-slate-400 hover:text-red-500 p-1 transition-colors cursor-pointer rounded-lg hover:bg-slate-100"
+                              title="Hapus"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                            {/* Quantity selection inside drawer */}
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-bold text-slate-500">Santri:</span>
+                              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => updateProductQuantity(p.id, p.quantity - 1)}
+                                  className="w-5 h-5 flex items-center justify-center bg-slate-50 border border-slate-150 text-slate-650 rounded-md hover:bg-slate-100 transition-colors cursor-pointer font-black text-xs"
+                                >
+                                  <Minus className="w-2.5 h-2.5" />
+                                </button>
+                                <span className="w-6 text-center font-bold text-xs text-slate-800 select-none">{p.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateProductQuantity(p.id, p.quantity + 1)}
+                                  className="w-5 h-5 flex items-center justify-center bg-slate-50 border border-slate-150 text-slate-650 rounded-md hover:bg-slate-100 transition-colors cursor-pointer font-black text-xs"
+                                >
+                                  <Plus className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <p className="text-xs text-slate-600 font-bold text-brand-green">Total: {formatPrice(((p.admissionFee || 0) + p.regFee + p.monthlyFee) * p.quantity)}</p>
+                              <p className="text-[10px] text-slate-400">Pangkal {formatPrice(p.admissionFee || 0)} | Reg {formatPrice(p.regFee)} | SPP {formatPrice(p.monthlyFee)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Buyer Information */}
+                  <div className="space-y-4">
+                    <label className="text-xs font-bold text-slate-450 uppercase tracking-wider block">Data Pendaftar / Calon Santri</label>
+                    
+                    <div className="space-y-1">
+                      <span className="text-xs font-medium text-slate-600 flex items-center gap-1"><User className="w-3 h-3 inline text-slate-400" /> Nama Lengkap Calon Santri</span>
+                      <input
+                        required
+                        type="text"
+                        value={custName}
+                        onChange={e => setCustName(e.target.value)}
+                        placeholder="Nama Lengkap"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-green focus:ring-1 focus:ring-brand-green/20 text-slate-800 bg-white placeholder:text-slate-300 transition-all outline-none text-sm text-[#0f172a]"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-xs font-medium text-slate-600 flex items-center gap-1"><Phone className="w-3 h-3 inline text-slate-400" /> Nomor HP / WhatsApp Orang Tua</span>
+                      <input
+                        required
+                        type="text"
+                        value={custPhone}
+                        onChange={e => setCustPhone(e.target.value)}
+                        placeholder="Contoh: 0812345678"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-green focus:ring-1 focus:ring-brand-green/20 text-slate-850 bg-white placeholder:text-slate-300 transition-all outline-none text-sm text-[#0f172a]"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-xs font-medium text-slate-600 flex items-center gap-1"><MapPin className="w-3 h-3 inline text-slate-400" /> Alamat Lengkap Domisili</span>
+                      <textarea
+                        required
+                        rows={3}
+                        value={custAddr}
+                        onChange={e => setCustAddr(e.target.value)}
+                        placeholder="Masukkan alamat domisili lengkap"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-green focus:ring-1 focus:ring-brand-green/20 text-slate-850 bg-white placeholder:text-slate-300 transition-all outline-none text-sm resize-none text-[#0f172a]"
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  {/* Automatic Referral Code Bound Banner */}
+                  <div className="p-4 bg-brand-green/5 border border-brand-green/10 rounded-xl space-y-1.5 animate-pulse">
+                    <div className="text-xs font-bold text-brand-green flex items-center gap-1.5 leading-none">
+                      <CheckCircle className="w-3.5 h-3.5 text-brand-yellow font-black" /> KODE REFERRAL TERPASANG OTOMATIS
+                    </div>
+                    <p className="text-[11px] text-slate-550 leading-relaxed font-semibold">
+                      Kode referral afiliasi Anda <strong className="font-mono text-brand-green bg-brand-green/10 px-1 py-0.5 rounded border border-brand-green/15">{partner.referralCode}</strong> telah dihubungkan secara otomatis. Pembelian ini akan memperoleh potongan khusus sebesar <strong className="text-brand-green">{formatPrice(cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0))}</strong> dan bonus pencatatan komisi tiering Anda <strong className="text-brand-green">({partner.commissionPercent}%)</strong> akan otomatis diakui.
+                    </p>
+                  </div>
+
+                  {/* Pricing Breakdowns */}
+                  <div className="space-y-2 border-t border-slate-150 pt-4 text-sm font-semibold">
+                    <div className="flex justify-between text-slate-500">
+                      <span>Total Biaya</span>
+                      <span>{formatPrice(cart.reduce((acc, p) => acc + ((p.admissionFee || 0) + p.regFee + p.monthlyFee) * p.quantity, 0))}</span>
+                    </div>
+                    
+                    {/* Since it is on behalf of their referral code, there is always the referral discount */}
+                    <div className="flex justify-between text-brand-green">
+                      <span className="flex items-center gap-1">Potongan Referral Khusus</span>
+                      <span>-{formatPrice(cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0))}</span>
+                    </div>
+
+                    <div className="flex justify-between text-base font-bold text-slate-900 border-t border-slate-100 pt-2.5 mt-2">
+                      <span>Jumlah Total Pembayaran</span>
+                      <span className="text-brand-green border-b-2 border-brand-green pb-0.5">
+                        {formatPrice(Math.max(0, cart.reduce((acc, p) => acc + ((p.admissionFee || 0) + p.regFee + p.monthlyFee) * p.quantity, 0) - cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0)))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isBuying || cart.length === 0}
+                    className="w-full py-3 px-4 bg-brand-green hover:bg-brand-green/90 disabled:bg-slate-350 text-white font-bold text-sm tracking-wide rounded-xl shadow-md cursor-pointer transition-all flex items-center justify-center gap-2"
+                  >
+                    {isBuying ? 'Memproses Pendaftaran...' : 'Kirim Pendaftaran Santri'}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

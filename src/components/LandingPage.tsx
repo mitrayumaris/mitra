@@ -22,6 +22,10 @@ import { DataService } from '../services/dataService';
 import { Product, PortalConfig } from '../types';
 import { getDirectDriveUrl } from '../utils/drive';
 
+interface CartItem extends Product {
+  quantity: number;
+}
+
 interface LandingPageProps {
   onLoginClick: () => void;
 }
@@ -32,11 +36,36 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
 
+  // Safely extract bannerUrls array to avoid NaN or invalid length errors
+  const bannerUrls = config?.bannerUrls && config.bannerUrls.length > 0 
+    ? config.bannerUrls 
+    : ['https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1200'];
+
   // Description expansion state
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
 
   // Checkout State
-  const [cart, setCart] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  // Quantities for each product selected prior to / during checkout
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+
+  const getProductQuantity = (productId: string) => {
+    return quantities[productId] || 1;
+  };
+
+  const updateProductQuantity = (productId: string, val: number) => {
+    const newVal = Math.max(1, val);
+    setQuantities(prev => ({
+      ...prev,
+      [productId]: newVal
+    }));
+    
+    // Also update cart quantity if it's already in the cart!
+    setCart(prev => prev.map(item => 
+      item.id === productId ? { ...item, quantity: newVal } : item
+    ));
+  };
+
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [buyerName, setBuyerName] = useState('');
   const [buyerPhone, setBuyerPhone] = useState('');
@@ -53,12 +82,12 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
 
   // Slide loop timer
   useEffect(() => {
-    if (config.bannerUrls.length <= 1) return;
+    if (bannerUrls.length <= 1) return;
     const timer = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % config.bannerUrls.length);
+      setCurrentSlide(prev => (prev + 1) % bannerUrls.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, [config.bannerUrls]);
+  }, [bannerUrls]);
 
   // Load latest state
   useEffect(() => {
@@ -90,8 +119,8 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
     if (found) {
       setVerifiedReferrer(found.name + ` (${found.level.toUpperCase()})`);
       setReferralPercent(found.commissionPercent);
-      // Compute discount based on individual product referralDiscounts configured by admin
-      const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0), 0);
+      // Compute discount based on individual product referralDiscounts and quantity
+      const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0);
       setReferralDiscount(totalDiscount);
     } else {
       setVerifiedReferrer('Kode tidak ditemukan');
@@ -103,7 +132,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
   // Recalculate discount whenever cart elements change but code stays verified
   useEffect(() => {
     if (verifiedReferrer && verifiedReferrer !== 'Kode tidak ditemukan') {
-      const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0), 0);
+      const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0);
       setReferralDiscount(totalDiscount);
     } else {
       setReferralDiscount(0);
@@ -118,7 +147,8 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
       } else {
         // Automatically open checkout drawer to make a transaction
         setIsCheckoutOpen(true);
-        return [...prev, product];
+        const qty = getProductQuantity(product.id);
+        return [...prev, { ...product, quantity: qty }];
       }
     });
   };
@@ -159,11 +189,11 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
   };
 
   const handleNextSlide = () => {
-    setCurrentSlide((currentSlide + 1) % config.bannerUrls.length);
+    setCurrentSlide((currentSlide + 1) % bannerUrls.length);
   };
 
   const handlePrevSlide = () => {
-    setCurrentSlide((currentSlide - 1 + config.bannerUrls.length) % config.bannerUrls.length);
+    setCurrentSlide((currentSlide - 1 + bannerUrls.length) % bannerUrls.length);
   };
 
   const filteredProducts = selectedCategory === 'Semua' 
@@ -237,7 +267,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
           <AnimatePresence mode="wait">
             <motion.img
               key={currentSlide}
-              src={getDirectDriveUrl(config.bannerUrls[currentSlide])}
+              src={getDirectDriveUrl(bannerUrls[currentSlide])}
               referrerPolicy="no-referrer"
               initial={{ opacity: 0, scale: 1.02 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -253,7 +283,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
         </div>
 
         {/* Carousel buttons */}
-        {config.bannerUrls.length > 1 && (
+        {bannerUrls.length > 1 && (
           <>
             <button 
               onClick={handlePrevSlide}
@@ -322,9 +352,6 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                         (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
                       }}
                     />
-                    <span className="absolute top-4 left-4 bg-brand-green/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm">
-                      {product.category}
-                    </span>
                   </div>
 
                   <div className="p-6 flex-grow flex flex-col">
@@ -343,7 +370,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                       </button>
                     </div>
 
-                    <div className="space-y-2 border-t border-slate-100 pt-4 mb-6">
+                    <div className="space-y-2 border-t border-slate-100 pt-4 mb-4">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-450 font-semibold text-brand-green">Uang Pangkal</span>
                         <span className="font-extrabold text-slate-900">{formatPrice(product.admissionFee || 0)}</span>
@@ -355,6 +382,39 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-450 font-medium">Iuran Bulanan (SPP)</span>
                         <span className="font-bold text-slate-950">{formatPrice(product.monthlyFee)} <span className="text-xs text-slate-400 font-normal">/ bln</span></span>
+                      </div>
+                    </div>
+
+                    {/* Jumlah Peserta Selector */}
+                    <div className="flex items-center justify-between bg-slate-50 border border-slate-150 p-3 rounded-2xl mb-4 text-xs font-semibold">
+                      <span className="text-slate-600 flex items-center gap-1">
+                        <User className="w-3.5 h-3.5 text-slate-400" /> Jml Peserta/Santri:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateProductQuantity(product.id, getProductQuantity(product.id) - 1)}
+                          className="w-7 h-7 flex items-center justify-center bg-white border border-slate-250 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-sm font-bold shadow-2xs"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          value={getProductQuantity(product.id)}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 1;
+                            updateProductQuantity(product.id, val);
+                          }}
+                          className="w-8 text-center font-bold text-slate-900 bg-transparent outline-none text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateProductQuantity(product.id, getProductQuantity(product.id) + 1)}
+                          className="w-7 h-7 flex items-center justify-center bg-white border border-slate-250 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-sm font-bold shadow-2xs"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
 
@@ -459,16 +519,51 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                     {/* Selected Programs */}
                     <div className="space-y-3">
                       <label className="text-xs font-bold text-slate-450 uppercase tracking-wider block">Program Yang Dipilih</label>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {cart.map(p => (
-                          <div key={p.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                            <div className="max-w-[70%]">
-                              <p className="font-semibold text-sm text-slate-800 truncate">{p.name}</p>
-                              <p className="text-xs text-slate-400 mt-0.5">{p.category}</p>
+                          <div key={p.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-150 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="max-w-[75%]">
+                                <p className="font-bold text-sm text-slate-950 truncate">{p.name}</p>
+                                <p className="text-xs text-slate-400 mt-0.5 font-medium">{p.category}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleCartItem(p)}
+                                className="text-slate-400 hover:text-red-500 p-1 transition-colors cursor-pointer rounded-lg hover:bg-slate-100"
+                                title="Hapus"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
                             </div>
-                            <div className="text-right">
-                              <p className="text-xs text-slate-500 font-semibold text-brand-green">Pangkal: {formatPrice(p.admissionFee || 0)}</p>
-                              <p className="text-xs text-slate-400">Reg: {formatPrice(p.regFee)} | SPP: {formatPrice(p.monthlyFee)}</p>
+                            
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                              {/* Quantity selection inside drawer */}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-bold text-slate-500">Santri:</span>
+                                <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateProductQuantity(p.id, p.quantity - 1)}
+                                    className="w-5 h-5 flex items-center justify-center bg-slate-50 border border-slate-150 text-slate-650 rounded-md hover:bg-slate-100 transition-colors cursor-pointer font-black text-xs"
+                                  >
+                                    <Minus className="w-2.5 h-2.5" />
+                                  </button>
+                                  <span className="w-6 text-center font-bold text-xs text-slate-800 select-none">{p.quantity}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateProductQuantity(p.id, p.quantity + 1)}
+                                    className="w-5 h-5 flex items-center justify-center bg-slate-50 border border-slate-150 text-slate-650 rounded-md hover:bg-slate-100 transition-colors cursor-pointer font-black text-xs"
+                                  >
+                                    <Plus className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <p className="text-xs text-slate-600 font-bold text-brand-green">Total: {formatPrice(((p.admissionFee || 0) + p.regFee + p.monthlyFee) * p.quantity)}</p>
+                                <p className="text-[10px] text-slate-400">Pangkal {formatPrice(p.admissionFee || 0)} | Reg {formatPrice(p.regFee)} | SPP {formatPrice(p.monthlyFee)}</p>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -537,7 +632,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                             if (found) {
                               setVerifiedReferrer(found.name + ` (${found.level.toUpperCase()})`);
                               setReferralPercent(found.commissionPercent);
-                              const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0), 0);
+                              const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0);
                               setReferralDiscount(totalDiscount);
                             } else if (val.trim() === '') {
                               setVerifiedReferrer(null);
@@ -579,7 +674,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                     <div className="space-y-2 border-t border-slate-150 pt-4 text-sm font-medium">
                       <div className="flex justify-between text-slate-500">
                         <span>Total Biaya</span>
-                        <span>{formatPrice(cart.reduce((acc, p) => acc + (p.admissionFee || 0) + p.regFee + p.monthlyFee, 0))}</span>
+                        <span>{formatPrice(cart.reduce((acc, p) => acc + ((p.admissionFee || 0) + p.regFee + p.monthlyFee) * p.quantity, 0))}</span>
                       </div>
                       
                       {referralDiscount > 0 && (
@@ -592,7 +687,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                       <div className="flex justify-between text-base font-bold text-slate-900 border-t border-slate-100 pt-2.5 mt-2">
                         <span>Jumlah Total Pembayaran</span>
                         <span className="text-brand-green">
-                          {formatPrice(Math.max(0, cart.reduce((acc, p) => acc + (p.admissionFee || 0) + p.regFee + p.monthlyFee, 0) - referralDiscount))}
+                          {formatPrice(Math.max(0, cart.reduce((acc, p) => acc + ((p.admissionFee || 0) + p.regFee + p.monthlyFee) * p.quantity, 0) - referralDiscount))}
                         </span>
                       </div>
                     </div>

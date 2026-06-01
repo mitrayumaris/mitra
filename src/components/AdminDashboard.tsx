@@ -26,7 +26,7 @@ import {
   ChevronUp,
   ChevronDown
 } from 'lucide-react';
-import { DataService } from '../services/dataService';
+import { DataService, registerDataListener } from '../services/dataService';
 import { Account, Product, Transaction, WithdrawalRequest, PortalConfig } from '../types';
 import { getDirectDriveUrl } from '../utils/drive';
 
@@ -105,6 +105,14 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [selectedWdForVerify, setSelectedWdForVerify] = useState<WithdrawalRequest | null>(null);
   const [wdProofInput, setWdProofInput] = useState('');
 
+  // Custom non-blocking Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+
   // Load and refresh state triggers
   const triggerRefresh = () => {
     setConfig(DataService.getConfig());
@@ -116,6 +124,10 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   useEffect(() => {
     triggerRefresh();
+    const unsubscribe = registerDataListener(() => {
+      triggerRefresh();
+    });
+    return () => unsubscribe();
   }, []);
 
   // ----------------------------------------------------
@@ -123,7 +135,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
   // ----------------------------------------------------
 
   // CONFIG (Logo, Banners)
-  const handleSaveConfig = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     const updated = {
       logoUrl: logoInput,
@@ -136,7 +148,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
       yayasanBankAccountName: yayasanBankAccountNameInput,
       footerText: footerTextInput
     };
-    DataService.saveConfig(updated);
+    await DataService.saveConfig(updated);
     setConfig(updated);
     alert('Konfigurasi portal berhasil disimpan!');
     triggerRefresh();
@@ -173,7 +185,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setIsAccountModalOpen(true);
   };
 
-  const handleSaveAccount = (e: React.FormEvent) => {
+  const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!accName || !accUsername || (!editingAccount && !accPassword)) {
       alert('Nama, Username, dan Password wajib diisi!');
@@ -193,16 +205,21 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
       commissionPercent: editingAccount?.commissionPercent || (accLevel === 'mitra' ? 15 : accLevel === 'submitra' ? 10 : 5)
     };
 
-    DataService.saveAccount(payload);
+    await DataService.saveAccount(payload);
     setIsAccountModalOpen(false);
     triggerRefresh();
   };
 
-  const handleDeleteAccount = (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus akun mitra ini? Alur relasi jaringan yang terikat dapat terpengaruh.')) {
-      DataService.deleteAccount(id);
-      triggerRefresh();
-    }
+  const handleDeleteAccount = async (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Akun Mitra',
+      message: 'Apakah Anda yakin ingin menghapus akun mitra ini? Alur relasi jaringan yang terikat dapat terpengaruh.',
+      onConfirm: async () => {
+        await DataService.deleteAccount(id);
+        triggerRefresh();
+      }
+    });
   };
 
   // PRODUCTS (CRUD)
@@ -232,7 +249,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setIsProductModalOpen(true);
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prodName || !prodCat) return;
 
@@ -249,16 +266,21 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
       order: prodOrder
     };
 
-    DataService.saveProduct(payload);
+    await DataService.saveProduct(payload);
     setIsProductModalOpen(false);
     triggerRefresh();
   };
 
-  const handleDeleteProduct = (id: string) => {
-    if (confirm('Hapus program pendidikan ini dari katalog pendaftaran?')) {
-      DataService.deleteProduct(id);
-      triggerRefresh();
-    }
+  const handleDeleteProduct = async (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Program Pendidikan',
+      message: 'Apakah Anda yakin ingin menghapus program pendidikan ini dari katalog pendaftaran?',
+      onConfirm: async () => {
+        await DataService.deleteProduct(id);
+        triggerRefresh();
+      }
+    });
   };
 
   const handleMoveProductOrder = async (prodId: string, direction: 'up' | 'down') => {
@@ -306,7 +328,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
     }
   };
 
-  const handleSaveCommissionOverride = (e: React.FormEvent) => {
+  const handleSaveCommissionOverride = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAccForComm) return;
 
@@ -318,7 +340,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
         commissionPercent: commPercent,
         referralCode: commReferral.trim().toUpperCase()
       };
-      DataService.saveAccount(updated);
+      await DataService.saveAccount(updated);
       alert('Informasi komisi dan relasi berhasil diperbarui!');
       triggerRefresh();
     }
@@ -330,34 +352,49 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
     setWdProofInput('https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&q=80&w=400');
   };
 
-  const handleConfirmWdVerify = () => {
+  const handleConfirmWdVerify = async () => {
     if (!selectedWdForVerify) return;
-    DataService.verifyWithdrawal(selectedWdForVerify.id, wdProofInput);
+    await DataService.verifyWithdrawal(selectedWdForVerify.id, wdProofInput);
     setSelectedWdForVerify(null);
     alert('Pencairan dana diperbarui dan disimpan!');
     triggerRefresh();
   };
 
   // TRANSACTION VERIFICATION
-  const handleVerifyTxPayment = (txId: string) => {
-    if (confirm('Sudah memverifikasi dana pendaftaran di rekening pusat? Komisi akan segera didistribusikan ke jaringan afiliasi setelah ini.')) {
-      DataService.verifyTransactionPayment(txId);
-      triggerRefresh();
-    }
+  const handleVerifyTxPayment = async (txId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Verifikasi Transaksi Pendaftaran',
+      message: 'Apakah Anda yakin sudah memverifikasi dana pendaftaran di rekening pusat? Komisi akan segera didistribusikan ke jaringan afiliasi setelah ini.',
+      onConfirm: async () => {
+        await DataService.verifyTransactionPayment(txId);
+        triggerRefresh();
+      }
+    });
   };
 
-  const handleCancelTxPayment = (txId: string) => {
-    if (confirm('Apakah Anda yakin ingin MEMBATALKAN transaksi pendaftaran ini? Status transaksi akan berubah menjadi BATAL dan aliran komisi tidak akan dihitung.')) {
-      DataService.cancelTransactionPayment(txId);
-      triggerRefresh();
-    }
+  const handleCancelTxPayment = async (txId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Batalkan Transaksi Pendaftaran',
+      message: 'Apakah Anda yakin ingin MEMBATALKAN transaksi pendaftaran ini? Status transaksi akan berubah menjadi BATAL dan aliran komisi tidak akan dihitung.',
+      onConfirm: async () => {
+        await DataService.cancelTransactionPayment(txId);
+        triggerRefresh();
+      }
+    });
   };
 
-  const handleDeleteTx = (txId: string) => {
-    if (confirm('HAPUS PERMANEN data transaksi pendaftaran ini? Data yang dihapus tidak bisa dikembalikan.')) {
-      DataService.deleteTransaction(txId);
-      triggerRefresh();
-    }
+  const handleDeleteTx = async (txId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Permanen Transaksi',
+      message: 'Apakah Anda yakin ingin HAPUS PERMANEN data transaksi pendaftaran ini? Data yang dihapus tidak bisa dikembalikan.',
+      onConfirm: async () => {
+        await DataService.deleteTransaction(txId);
+        triggerRefresh();
+      }
+    });
   };
 
   const handleWipeDemoData = async () => {
@@ -1013,9 +1050,9 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <td className="p-4 text-xs">
                             {tx.products.map(p => (
                               <div key={p.productId} className="font-semibold text-slate-800 space-y-0.5">
-                                <div>• {p.productName}</div>
+                                <div>• {p.productName} {p.quantity && p.quantity > 1 ? `(${p.quantity} Peserta)` : ''}</div>
                                 <div className="text-[10px] text-slate-400 pl-2">
-                                  Pangkal: {formatPrice(p.admissionFee || 0)} | Reg: {formatPrice(p.regFee)} | SPP: {formatPrice(p.monthlyFee)}
+                                  Pangkal: {formatPrice(p.admissionFee || 0)} | Reg: {formatPrice(p.regFee)} | SPP: {formatPrice(p.monthlyFee)} {p.quantity && p.quantity > 1 ? `x ${p.quantity} Peserta` : ''}
                                 </div>
                               </div>
                             ))}
@@ -1470,6 +1507,46 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   Konfirmasi Sudah Transfer
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CONFIRMATION MODAL */}
+      {confirmModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div onClick={() => setConfirmModal(null)} className="absolute inset-0 bg-slate-950/45 backdrop-blur-xs"></div>
+          
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200 flex flex-col z-10 p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-amber-50 rounded-2xl text-amber-500 border border-amber-100 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-slate-950 text-sm leading-tight">{confirmModal.title}</h4>
+                <p className="text-xs text-slate-500 leading-normal">{confirmModal.message}</p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 border bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const onConfirm = confirmModal.onConfirm;
+                  setConfirmModal(null);
+                  await onConfirm();
+                }}
+                className="px-4 py-2 bg-brand-green hover:bg-brand-green/95 text-white rounded-xl text-xs font-bold cursor-pointer transition-all"
+              >
+                Konfirmasi
+              </button>
             </div>
           </div>
         </div>
