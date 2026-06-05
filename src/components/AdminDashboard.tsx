@@ -27,7 +27,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { DataService, registerDataListener } from '../services/dataService';
-import { Account, Product, Transaction, WithdrawalRequest, PortalConfig } from '../types';
+import { Account, Product, Transaction, WithdrawalRequest, PortalConfig, getLevelDisplayName } from '../types';
 import { getDirectDriveUrl } from '../utils/drive';
 
 interface AdminDashboardProps {
@@ -202,7 +202,12 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
       level: accLevel,
       parentId: accParentId || undefined,
       referralCode: editingAccount?.referralCode || accName.slice(0, 4).toUpperCase() + Math.floor(100 + Math.random() * 900),
-      commissionPercent: editingAccount?.commissionPercent || (accLevel === 'mitra' ? 15 : accLevel === 'submitra' ? 10 : 5)
+      commissionPercent: editingAccount?.commissionPercent || (
+        accLevel === 'konsultan' ? 25 :
+        accLevel === 'induk' ? 20 :
+        accLevel === 'mitra' ? 15 :
+        accLevel === 'agen' ? 10 : 5
+      )
     };
 
     await DataService.saveAccount(payload);
@@ -753,11 +758,14 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           </td>
                           <td className="p-4">
                             <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                              acc.level === 'konsultan' ? 'bg-violet-50 text-violet-700 border-violet-200/50' :
+                              acc.level === 'induk' ? 'bg-pink-50 text-pink-700 border-pink-200/50' :
                               acc.level === 'mitra' ? 'bg-indigo-50 text-indigo-700 border-indigo-200/50' :
-                              acc.level === 'submitra' ? 'bg-sky-50 text-sky-700 border-sky-200/50' :
-                              'bg-amber-50 text-amber-700 border-amber-200/50'
+                              acc.level === 'agen' ? 'bg-sky-50 text-sky-700 border-sky-200/50' :
+                              acc.level === 'subagen' ? 'bg-amber-50 text-amber-700 border-amber-200/50' :
+                              'bg-slate-50 text-slate-600 border-slate-200/50'
                             }`}>
-                              {acc.level === 'mitra' ? 'Mitra (L1)' : acc.level === 'submitra' ? 'Sub-Mitra (L2)' : 'Agen (L3)'}
+                              {getLevelDisplayName(acc.level)}
                             </span>
                           </td>
                           <td className="p-4 font-mono font-medium">{acc.phone}</td>
@@ -1159,7 +1167,14 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                             <span className="font-bold text-slate-950">{wd.requesterName}</span>
                           </td>
                           <td className="p-4">
-                            <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-150 py-0.5 px-2 rounded-full uppercase font-bold text-[10px]">{wd.requesterLevel}</span>
+                            <span className={`text-[10px] py-0.5 px-2 rounded-full uppercase font-bold border ${
+                              wd.requesterLevel === 'konsultan' ? 'bg-violet-50 text-violet-700 border-violet-150' :
+                              wd.requesterLevel === 'induk' ? 'bg-pink-50 text-pink-700 border-pink-150' :
+                              wd.requesterLevel === 'mitra' ? 'bg-indigo-50 text-indigo-700 border-indigo-150' :
+                              wd.requesterLevel === 'agen' ? 'bg-sky-50 text-sky-700 border-sky-150' :
+                              wd.requesterLevel === 'subagen' ? 'bg-amber-50 text-amber-700 border-amber-150' :
+                              'bg-slate-50 text-slate-700 border-slate-150'
+                            }`}>{getLevelDisplayName(wd.requesterLevel)}</span>
                           </td>
                           <td className="p-4 font-black text-slate-950">{formatPrice(wd.amount)}</td>
                           <td className="p-4 text-xs font-mono">{new Date(wd.createdAt).toLocaleDateString()}</td>
@@ -1282,9 +1297,11 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     onChange={e => setAccLevel(e.target.value as Account['level'])}
                     className="w-full px-3 py-2.5 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl"
                   >
-                    <option value="mitra">Level 1: Mitra Utama (Area)</option>
-                    <option value="submitra">Level 2: Sub-Mitra (Distrik)</option>
-                    <option value="agen">Level 3: Agen (Ujung Tombak)</option>
+                    <option value="konsultan">Level 1: Konsultan</option>
+                    <option value="induk">Level 2: Induk</option>
+                    <option value="mitra">Level 3: Mitra</option>
+                    <option value="agen">Level 4: Agen</option>
+                    <option value="subagen">Level 5: Sub Agen</option>
                   </select>
                 </div>
 
@@ -1297,7 +1314,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   >
                     <option value="">Direct Pusat (Tidak Ada)</option>
                     {accounts.filter(a => a.level !== 'admin' && a.id !== editingAccount?.id).map(a => (
-                      <option key={a.id} value={a.id}>{a.name} ({a.level.toUpperCase()})</option>
+                      <option key={a.id} value={a.id}>{a.name} ({getLevelDisplayName(a.level)})</option>
                     ))}
                   </select>
                 </div>
@@ -1476,7 +1493,7 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div className="p-6 space-y-4">
               <div className="bg-brand-green/10 rounded-2xl p-4 border border-brand-green/20">
                 <p className="text-xs text-brand-green uppercase font-bold">Rincian Penarikan:</p>
-                <p className="font-bold text-slate-850 text-base mt-2">{selectedWdForVerify.requesterName} (<span className="uppercase text-brand-green">{selectedWdForVerify.requesterLevel}</span>)</p>
+                <p className="font-bold text-slate-850 text-base mt-2">{selectedWdForVerify.requesterName} (<span className="uppercase text-brand-green">{getLevelDisplayName(selectedWdForVerify.requesterLevel)}</span>)</p>
                 <p className="text-xl font-black text-rose-600 mt-1">{formatPrice(selectedWdForVerify.amount)}</p>
               </div>
 

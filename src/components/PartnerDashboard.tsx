@@ -28,7 +28,7 @@ import {
   BookMarked
 } from 'lucide-react';
 import { DataService, registerDataListener } from '../services/dataService';
-import { Account, Product, Transaction, WithdrawalRequest, TahfidzProgress } from '../types';
+import { Account, Product, Transaction, WithdrawalRequest, TahfidzProgress, getLevelDisplayName } from '../types';
 import { getDirectDriveUrl } from '../utils/drive';
 
 interface PartnerDashboardProps {
@@ -209,7 +209,7 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
             <div className="flex items-center gap-2">
               <h1 className="font-extrabold text-xl text-white leading-tight">{partner.name}</h1>
               <span className="inline-flex py-0.5 px-2.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand-yellow/15 text-brand-yellow border border-brand-yellow/30">
-                {partner.level === 'mitra' ? 'Level 1: Mitra Utama' : partner.level === 'submitra' ? 'Level 2: Sub-Mitra' : 'Level 3: Agen'}
+                {getLevelDisplayName(partner.level)}
               </span>
             </div>
             <p className="text-xs text-slate-350 mt-1">Sistem Penjualan Multi-Level Terpadu Nilai-Nilai Tahfidz Berbasis Coding &amp; AI</p>
@@ -273,7 +273,7 @@ export default function PartnerDashboard({ partner, onLogout }: PartnerDashboard
                   <h4 className="font-extrabold text-white text-base md:text-lg">Tingkatkan Syiar Bersama Link Afiliasi Anda</h4>
                   <span className="text-xs font-mono font-black text-brand-green bg-brand-yellow px-2.5 py-0.5 rounded shadow-sm">{partner.referralCode}</span>
                 </div>
-                <p className="text-xs text-slate-100 leading-relaxed max-w-2xl">Bagikan link atau kode referral Anda ini kepada masyarakat. Setiap pendaftar baru otomatis mendapatkan diskon 10% dan komisi pembagian hasil berjenjang akan langsung masuk ke dompet Anda secara syariah.</p>
+                <p className="text-xs text-slate-100 leading-relaxed max-w-2xl">Bagikan link atau kode referral Anda ini kepada masyarakat. Setiap pendaftar otomatis mendapatkan diskon khusus dan komisi pembagian hasil berjenjang akan langsung masuk ke dompet Anda secara syariah.</p>
               </div>
               <button
                 onClick={handleCopyLink}

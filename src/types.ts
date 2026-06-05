@@ -2,7 +2,20 @@
  * Types definition for Tahfidz Coding Sales Portal
  */
 
-export type UserLevel = 'admin' | 'mitra' | 'submitra' | 'agen';
+export type UserLevel = 'admin' | 'konsultan' | 'induk' | 'mitra' | 'agen' | 'subagen' | 'submitra';
+
+export const getLevelDisplayName = (level: string): string => {
+  switch (level?.toLowerCase()) {
+    case 'konsultan': return 'Konsultan';
+    case 'induk': return 'Induk';
+    case 'mitra': return 'Mitra';
+    case 'agen': return 'Agen';
+    case 'subagen': return 'Sub Agen';
+    case 'submitra': return 'Induk'; // Legacy support
+    case 'admin': return 'Admin';
+    default: return level || 'Mitra';
+  }
+};
 
 export interface Account {
   id: string;

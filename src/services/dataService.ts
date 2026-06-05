@@ -118,38 +118,62 @@ const DEFAULT_ACCOUNTS: Account[] = [
     commissionPercent: 0
   },
   {
-    id: 'mitra-1',
-    name: 'Ahmad Muzakki (Mitra Riau)',
-    username: 'ahmad_mitra',
+    id: 'kons-1',
+    name: 'Ahmad Muzakki (Konsultan Utama)',
+    username: 'ahmad_konsultan',
     password: 'password123',
     phone: '08111222333',
     address: 'Pekanbaru, Riau',
-    level: 'mitra',
-    referralCode: 'AHMADMITR1',
-    commissionPercent: 15
+    level: 'konsultan',
+    referralCode: 'AHMADKONS1',
+    commissionPercent: 25
   },
   {
-    id: 'sub-1',
-    name: 'Siti Sarah (Sub-Mitra Pekanbaru)',
-    username: 'siti_sub',
+    id: 'induk-1',
+    name: 'Siti Sarah (Induk Pekanbaru)',
+    username: 'siti_induk',
     password: 'password123',
     phone: '08222333444',
     address: 'Kec. Tampan, Pekanbaru',
-    level: 'submitra',
-    parentId: 'mitra-1',
-    referralCode: 'SITISUBPEK2',
-    commissionPercent: 10
+    level: 'induk',
+    parentId: 'kons-1',
+    referralCode: 'SITIINDPEK2',
+    commissionPercent: 20
   },
   {
-    id: 'agen-1',
-    name: 'Budi Santoso (Agen Tampan)',
-    username: 'budi_agen',
+    id: 'mitra-1',
+    name: 'Budi Santoso (Mitra Area)',
+    username: 'budi_mitra',
     password: 'password123',
     phone: '08333444555',
     address: 'Perumahan Panam Raya, Pekanbaru',
+    level: 'mitra',
+    parentId: 'induk-1',
+    referralCode: 'BUDIMITPEK3',
+    commissionPercent: 15
+  },
+  {
+    id: 'agen-1',
+    name: 'Joko Supriyanto (Agen Tampan)',
+    username: 'joko_agen',
+    password: 'password123',
+    phone: '08444555666',
+    address: 'Jl. Melati No. 5, Pekanbaru',
     level: 'agen',
-    parentId: 'sub-1',
-    referralCode: 'BUDIAGETAP3',
+    parentId: 'mitra-1',
+    referralCode: 'JOKOAGETAP4',
+    commissionPercent: 10
+  },
+  {
+    id: 'subagen-1',
+    name: 'Diana Putri (Sub Agen)',
+    username: 'diana_subagen',
+    password: 'password123',
+    phone: '08555666777',
+    address: 'Perum. Pandau Permai, Pekanbaru',
+    level: 'subagen',
+    parentId: 'agen-1',
+    referralCode: 'DIANASUBPEK5',
     commissionPercent: 5
   }
 ];
@@ -171,29 +195,43 @@ const DEFAULT_TRANSACTIONS: Transaction[] = [
     totalPrice: 400000,
     discountAmount: 25000,
     payableAmount: 375000,
-    referralCodeUsed: 'BUDIAGETAP3',
-    referrerId: 'agen-1',
+    referralCodeUsed: 'DIANASUBPEK5',
+    referrerId: 'subagen-1',
     commissions: [
       {
-        recipientId: 'agen-1',
-        recipientName: 'Budi Santoso (Agen Tampan)',
-        level: 'agen',
-        amount: 12500,
+        recipientId: 'subagen-1',
+        recipientName: 'Diana Putri (Sub Agen)',
+        level: 'subagen',
+        amount: 18750,
         percentage: 5
       },
       {
-        recipientId: 'sub-1',
-        recipientName: 'Siti Sarah (Sub-Mitra Pekanbaru)',
-        level: 'submitra',
-        amount: 25000,
-        percentage: 10
+        recipientId: 'agen-1',
+        recipientName: 'Joko Supriyanto (Agen Tampan)',
+        level: 'agen',
+        amount: 18750,
+        percentage: 5
       },
       {
         recipientId: 'mitra-1',
-        recipientName: 'Ahmad Muzakki (Mitra Riau)',
+        recipientName: 'Budi Santoso (Mitra Area)',
         level: 'mitra',
-        amount: 37500,
-        percentage: 15
+        amount: 18750,
+        percentage: 5
+      },
+      {
+        recipientId: 'induk-1',
+        recipientName: 'Siti Sarah (Induk Pekanbaru)',
+        level: 'induk',
+        amount: 18750,
+        percentage: 5
+      },
+      {
+        recipientId: 'kons-1',
+        recipientName: 'Ahmad Muzakki (Konsultan Utama)',
+        level: 'konsultan',
+        amount: 18750,
+        percentage: 5
       }
     ],
     status: 'verified',
@@ -204,9 +242,9 @@ const DEFAULT_TRANSACTIONS: Transaction[] = [
 const DEFAULT_WITHDRAWALS: WithdrawalRequest[] = [
   {
     id: 'wd-1',
-    requesterId: 'mitra-1',
+    requesterId: 'kons-1',
     requesterName: 'Ahmad Muzakki',
-    requesterLevel: 'mitra',
+    requesterLevel: 'konsultan',
     amount: 30000,
     status: 'completed',
     proofImage: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&q=80&w=400',
@@ -215,9 +253,9 @@ const DEFAULT_WITHDRAWALS: WithdrawalRequest[] = [
   },
   {
     id: 'wd-2',
-    requesterId: 'agen-1',
-    requesterName: 'Budi Santoso',
-    requesterLevel: 'agen',
+    requesterId: 'subagen-1',
+    requesterName: 'Diana Putri',
+    requesterLevel: 'subagen',
     amount: 10000,
     status: 'pending',
     createdAt: '2026-05-26T04:15:00Z'
@@ -300,6 +338,28 @@ function setStored<T>(key: string, val: T): void {
   }
 }
 
+// Recursively sanitize objects of undefined values before saving to Firestore
+function cleanUndefined<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanUndefined(item)) as unknown as T;
+  }
+  
+  const result: any = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const val = obj[key];
+      if (val !== undefined) {
+        result[key] = cleanUndefined(val);
+      }
+    }
+  }
+  return result as T;
+}
+
 // Memory Cache Layers (Pre-loaded from local storage synchronously on load to prevent any flash of template defaults)
 let cacheProducts: Product[] = getStored<Product[]>(KEYS.PRODUCTS, DEFAULT_PRODUCTS);
 let cacheAccounts: Account[] = getStored<Account[]>(KEYS.ACCOUNTS, DEFAULT_ACCOUNTS);
@@ -348,7 +408,7 @@ export const initializeFirebaseSync = async () => {
           cachePortalConfig = snap.data() as PortalConfig;
           setStored(KEYS.CONFIG, cachePortalConfig);
         } else {
-          await setDoc(doc(db, 'portalConfig', 'main'), DEFAULT_CONFIG);
+          await setDoc(doc(db, 'portalConfig', 'main'), cleanUndefined(DEFAULT_CONFIG));
           cachePortalConfig = DEFAULT_CONFIG;
         }
         isConfigLoaded = true;
@@ -371,7 +431,7 @@ export const initializeFirebaseSync = async () => {
           const hasSeeded = getStored<boolean>('tcs_products_seeded', false);
           if (!hasSeeded) {
             for (const p of DEFAULT_PRODUCTS) {
-              await setDoc(doc(db, 'products', p.id), p);
+              await setDoc(doc(db, 'products', p.id), cleanUndefined(p));
             }
             setStored('tcs_products_seeded', true);
             cacheProducts = DEFAULT_PRODUCTS;
@@ -409,7 +469,7 @@ export const initializeFirebaseSync = async () => {
           const hasSeeded = getStored<boolean>('tcs_accounts_seeded', false);
           if (!hasSeeded) {
             for (const a of DEFAULT_ACCOUNTS) {
-              await setDoc(doc(db, 'accounts', a.id), a);
+              await setDoc(doc(db, 'accounts', a.id), cleanUndefined(a));
             }
             setStored('tcs_accounts_seeded', true);
             cacheAccounts = DEFAULT_ACCOUNTS;
@@ -447,7 +507,7 @@ export const initializeFirebaseSync = async () => {
           const hasSeeded = getStored<boolean>('tcs_transactions_seeded', false);
           if (!hasSeeded) {
             for (const t of DEFAULT_TRANSACTIONS) {
-              await setDoc(doc(db, 'transactions', t.id), t);
+              await setDoc(doc(db, 'transactions', t.id), cleanUndefined(t));
             }
             setStored('tcs_transactions_seeded', true);
             cacheTransactions = DEFAULT_TRANSACTIONS;
@@ -486,7 +546,7 @@ export const initializeFirebaseSync = async () => {
           const hasSeeded = getStored<boolean>('tcs_withdrawals_seeded', false);
           if (!hasSeeded) {
             for (const w of DEFAULT_WITHDRAWALS) {
-              await setDoc(doc(db, 'withdrawals', w.id), w);
+              await setDoc(doc(db, 'withdrawals', w.id), cleanUndefined(w));
             }
             setStored('tcs_withdrawals_seeded', true);
             cacheWithdrawals = DEFAULT_WITHDRAWALS;
@@ -525,7 +585,7 @@ export const initializeFirebaseSync = async () => {
           const hasSeeded = getStored<boolean>('tcs_tahfidz_seeded', false);
           if (!hasSeeded) {
             for (const t of DEFAULT_TAHFIDZ) {
-              await setDoc(doc(db, 'tahfidzProgress', t.partnerId), t);
+              await setDoc(doc(db, 'tahfidzProgress', t.partnerId), cleanUndefined(t));
             }
             setStored('tcs_tahfidz_seeded', true);
             cacheTahfidzProgress = DEFAULT_TAHFIDZ;
@@ -570,7 +630,7 @@ export const DataService = {
     setStored(KEYS.CONFIG, config);
     notifyListeners();
     try {
-      await setDoc(doc(db, 'portalConfig', 'main'), config);
+      await setDoc(doc(db, 'portalConfig', 'main'), cleanUndefined(config));
     } catch (e) {
       console.error("Firebase saveConfig error:", e);
     }
@@ -602,7 +662,7 @@ export const DataService = {
     notifyListeners();
 
     try {
-      await setDoc(doc(db, 'products', target.id), target);
+      await setDoc(doc(db, 'products', target.id), cleanUndefined(target));
     } catch (e) {
       console.error("Firebase saveProduct error:", e);
     }
@@ -647,7 +707,7 @@ export const DataService = {
     notifyListeners();
 
     try {
-      await setDoc(doc(db, 'accounts', target.id), target);
+      await setDoc(doc(db, 'accounts', target.id), cleanUndefined(target));
     } catch (e) {
       console.error("Firebase saveAccount error:", e);
     }
@@ -792,7 +852,7 @@ export const DataService = {
     notifyListeners();
 
     try {
-      await setDoc(doc(db, 'transactions', newTx.id), newTx);
+      await setDoc(doc(db, 'transactions', newTx.id), cleanUndefined(newTx));
     } catch (e) {
       console.error("Firebase createTransaction error:", e);
     }
@@ -810,7 +870,7 @@ export const DataService = {
       notifyListeners();
 
       try {
-        await setDoc(doc(db, 'transactions', id), updatedTx);
+        await setDoc(doc(db, 'transactions', id), cleanUndefined(updatedTx));
       } catch (e) {
         console.error("Firebase verifyTransactionPayment error:", e);
       }
@@ -828,7 +888,7 @@ export const DataService = {
       notifyListeners();
 
       try {
-        await setDoc(doc(db, 'transactions', id), updatedTx);
+        await setDoc(doc(db, 'transactions', id), cleanUndefined(updatedTx));
       } catch (e) {
         console.error("Firebase cancelTransactionPayment error:", e);
       }
@@ -882,7 +942,7 @@ export const DataService = {
     notifyListeners();
 
     try {
-      await setDoc(doc(db, 'withdrawals', newWd.id), newWd);
+      await setDoc(doc(db, 'withdrawals', newWd.id), cleanUndefined(newWd));
     } catch (e) {
       console.error("Firebase createWithdrawal error:", e);
     }
@@ -905,7 +965,7 @@ export const DataService = {
       notifyListeners();
 
       try {
-        await setDoc(doc(db, 'withdrawals', id), updatedWd);
+        await setDoc(doc(db, 'withdrawals', id), cleanUndefined(updatedWd));
       } catch (e) {
         console.error("Firebase verifyWithdrawal error:", e);
       }
@@ -1018,7 +1078,7 @@ export const DataService = {
     notifyListeners();
 
     try {
-      await setDoc(doc(db, 'tahfidzProgress', partnerId), updatedItem);
+      await setDoc(doc(db, 'tahfidzProgress', partnerId), cleanUndefined(updatedItem));
     } catch (e) {
       console.error("Firebase saveTahfidzLog error:", e);
     }

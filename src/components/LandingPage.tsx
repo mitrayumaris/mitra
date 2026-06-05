@@ -19,7 +19,7 @@ import {
   BookMarked
 } from 'lucide-react';
 import { DataService } from '../services/dataService';
-import { Product, PortalConfig } from '../types';
+import { Product, PortalConfig, getLevelDisplayName } from '../types';
 import { getDirectDriveUrl } from '../utils/drive';
 
 interface CartItem extends Product {
@@ -117,7 +117,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
     const found = accounts.find(a => a.referralCode.toUpperCase() === cleanCode);
 
     if (found) {
-      setVerifiedReferrer(found.name + ` (${found.level.toUpperCase()})`);
+      setVerifiedReferrer(found.name + ` (${getLevelDisplayName(found.level)})`);
       setReferralPercent(found.commissionPercent);
       // Compute discount based on individual product referralDiscounts and quantity
       const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0);
@@ -630,7 +630,7 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                             const cleanCode = val.trim().toUpperCase();
                             const found = accounts.find(a => a.referralCode.toUpperCase() === cleanCode);
                             if (found) {
-                              setVerifiedReferrer(found.name + ` (${found.level.toUpperCase()})`);
+                              setVerifiedReferrer(found.name + ` (${getLevelDisplayName(found.level)})`);
                               setReferralPercent(found.commissionPercent);
                               const totalDiscount = cart.reduce((acc, p) => acc + (p.referralDiscount || 0) * p.quantity, 0);
                               setReferralDiscount(totalDiscount);
