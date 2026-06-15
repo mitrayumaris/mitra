@@ -15,6 +15,7 @@ import {
   Eye, 
   Image as ImageIcon,
   DollarSign,
+  Receipt,
   Phone,
   MapPin,
   Lock,
@@ -43,10 +44,22 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(DataService.getWithdrawals());
 
   // Navigation state inside dashboard
-  const [activeTab, setActiveTab] = useState<'config' | 'accounts' | 'commissions' | 'products' | 'pending-txs' | 'withdrawals'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'accounts' | 'commissions' | 'products' | 'pending-txs' | 'withdrawals' | 'spp'>('config');
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Form States - SPP BULANAN
+  const [sppStudentName, setSppStudentName] = useState('');
+  const [sppMonth, setSppMonth] = useState(() => {
+    const d = new Date();
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return `${months[d.getMonth()]} ${d.getFullYear()}`;
+  });
+  const [sppAmount, setSppAmount] = useState<number>(0);
+  const [sppReferrerId, setSppReferrerId] = useState('');
+  const [sppStatus, setSppStatus] = useState<'pending' | 'verified'>('verified');
+  const [sppNotes, setSppNotes] = useState('');
 
   // Form States - CONFIG
   const [logoInput, setLogoInput] = useState(config.logoUrl);
@@ -351,6 +364,43 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
     }
   };
 
+  // SPP PROCESSOR HANDLER
+  const handleSaveSpp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sppStudentName.trim()) {
+      alert('Nama Santri/Pendaftar harus diisi.');
+      return;
+    }
+    if (!sppReferrerId) {
+      alert('Silakan pilih Mitra/Agen penerima komisi utama.');
+      return;
+    }
+    if (sppAmount <= 0) {
+      alert('Nominal SPP bulanan harus berupa angka positif.');
+      return;
+    }
+
+    try {
+      await DataService.createSppTransaction({
+        studentName: sppStudentName.trim(),
+        sppMonth: sppMonth,
+        amount: sppAmount,
+        referrerId: sppReferrerId,
+        status: sppStatus,
+        notes: sppNotes.trim()
+      });
+      alert('Pencatatan komisi SPP Bulanan berhasil disimpan ke database!');
+      setSppStudentName('');
+      setSppAmount(0);
+      setSppNotes('');
+      setSppReferrerId('');
+      triggerRefresh();
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan saat menyimpan data SPP.');
+    }
+  };
+
   // WITHDRAWALS VERIFICATION
   const handleOpenWdVerify = (wd: WithdrawalRequest) => {
     setSelectedWdForVerify(wd);
@@ -527,6 +577,16 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 {withdrawals.filter(w => w.status === 'pending').length}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('spp')}
+            className={`flex items-center space-x-2.5 px-4 py-2.5 md:py-3 rounded-xl font-bold text-xs md:text-sm transition-all relative cursor-pointer whitespace-nowrap shrink-0 md:w-full gap-2 ${
+              activeTab === 'spp' ? 'bg-brand-yellow/15 text-brand-green border-b-2 md:border-b-0 md:border-r-3 border-brand-green font-extrabold shadow-2xs' : 'text-slate-650 hover:bg-slate-50'
+            }`}
+          >
+            <Receipt className="w-4 h-4 text-brand-green shrink-0" />
+            <span>Komisi SPP Bulanan</span>
           </button>
         </aside>
 
@@ -1212,6 +1272,262 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB 7: SPP BULANAN */}
+          {activeTab === 'spp' && (
+            <div className="space-y-6 animate-fade-in text-slate-850">
+              <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-2xs">
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-brand-green" />
+                    Input Komisaris SPP Bulanan Santri
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-0.5">Catat setoran biaya bulanan/SPP santri dengan nominal fleksibel. Alur komisi berjenjang syariah akan langsung dialokasikan ke masing-masing dompet kemitraan di atasnya.</p>
+                </div>
+
+                <form onSubmit={handleSaveSpp} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Nama Santri / Pendaftar</label>
+                      <input
+                        required
+                        type="text"
+                        value={sppStudentName}
+                        onChange={e => setSppStudentName(e.target.value)}
+                        placeholder="Contoh: Muhammad Reyhan"
+                        className="w-full px-4 py-3 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/20"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Periode Bulan SPP</label>
+                        <select
+                          value={sppMonth}
+                          onChange={e => setSppMonth(e.target.value)}
+                          className="w-full px-4 py-3 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl outline-none focus:border-brand-green"
+                        >
+                          {(() => {
+                            const result = [];
+                            const d = new Date();
+                            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                            const year = d.getFullYear();
+                            // Generate last 6 months and next 6 months for selection
+                            for (let i = -6; i <= 6; i++) {
+                              const tempDate = new Date(year, d.getMonth() + i, 1);
+                              const mName = months[tempDate.getMonth()];
+                              const yVal = tempDate.getFullYear();
+                              result.push(`${mName} ${yVal}`);
+                            }
+                            return result.map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Nominal SPP Bulanan (Rp)</label>
+                        <input
+                          required
+                          type="number"
+                          min="0"
+                          value={sppAmount || ''}
+                          onChange={e => setSppAmount(Number(e.target.value))}
+                          placeholder="Contoh: 350000"
+                          className="w-full px-4 py-3 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Mitra / Agen Santri (Penerima Komisi Utama)</label>
+                      <select
+                        required
+                        value={sppReferrerId}
+                        onChange={e => setSppReferrerId(e.target.value)}
+                        className="w-full px-4 py-3 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl outline-none focus:border-brand-green"
+                      >
+                        <option value="">-- Pilih Mitra / Agen Santri --</option>
+                        {accounts
+                          .filter(acc => acc.level !== 'admin')
+                          .map(acc => (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} — {getLevelDisplayName(acc.level)} ({acc.referralCode || '-'})
+                            </option>
+                          ))
+                        }
+                      </select>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        Siapa yang mendaftarkan atau mengasuh santri ini. Seluruh pohon jaringan kemitraan di atasnya akan menikmati komisi proporsional berjenjang syariah secara live.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Status Verifikasi Setoran</label>
+                        <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                          <label className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer bg-slate-50 hover:bg-slate-100/70 p-3 rounded-xl border border-slate-200 flex-1">
+                            <input
+                              type="radio"
+                              name="sppStatus"
+                              checked={sppStatus === 'verified'}
+                              onChange={() => setSppStatus('verified')}
+                              className="text-brand-green focus:ring-brand-green focus:ring-0"
+                            />
+                            <div className="flex flex-col text-xs">
+                              <span className="font-bold text-slate-800">Verifikasi Langsung (Lunas)</span>
+                              <span className="text-[10px] text-slate-400">Komisi langsung masuk ke dompet aktif</span>
+                            </div>
+                          </label>
+                          <label className="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer bg-slate-50 hover:bg-slate-100/70 p-3 rounded-xl border border-slate-200 flex-1">
+                            <input
+                              type="radio"
+                              name="sppStatus"
+                              checked={sppStatus === 'pending'}
+                              onChange={() => setSppStatus('pending')}
+                              className="text-brand-green focus:ring-brand-green focus:ring-0"
+                            />
+                            <div className="flex flex-col text-xs">
+                              <span className="font-bold text-slate-800">Pending Bayar (Verifikasi Manual)</span>
+                              <span className="text-[10px] text-slate-400">Komisi masuk ke saldo tertunda</span>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Keterangan / Catatan Tambahan</label>
+                        <textarea
+                          rows={2}
+                          value={sppNotes}
+                          onChange={e => setSppNotes(e.target.value)}
+                          placeholder="Contoh: Transfer Bank Syariah Indonesia, nomor struk #99281"
+                          className="w-full px-4 py-2.5 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/20 resize-none"
+                        ></textarea>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        className="w-full sm:w-auto px-6 py-3 bg-brand-green hover:bg-brand-green/95 text-white font-extrabold text-sm rounded-xl cursor-pointer shadow-sm transition-all flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4 text-white" />
+                        <span>Simpan SPP &amp; Alokasikan Komisi</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              {/* RIWAYAT SPP */}
+              <div className="bg-white rounded-3xl border border-slate-200 p-8 space-y-6 shadow-2xs">
+                <div>
+                  <h4 className="text-lg font-bold text-slate-900">Histori Pembayaran SPP Bulanan &amp; Alokasi Jaringan</h4>
+                  <p className="text-xs text-slate-400 mt-0.5">Daftar lengkap seluruh transaksi SPP santri yang tercatat beserta rincian komisi berjenjang dari bawah ke atas.</p>
+                </div>
+
+                {transactions.filter(t => t.type === 'spp').length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-sm animate-pulse">Belum ada riwayat pencatatan SPP bulanan santri.</div>
+                ) : (
+                  <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-3xs">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-extrabold text-[10px] uppercase tracking-wider">
+                          <th className="p-4">Waktu / ID</th>
+                          <th className="p-4">Santri &amp; Bulan SPP</th>
+                          <th className="p-4">Nominal SPP</th>
+                          <th className="p-4">Alokasi Komisi Berjenjang</th>
+                          <th className="p-4 text-right">Status / Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-150 text-slate-700">
+                        {transactions
+                          .filter(t => t.type === 'spp')
+                          .map(tx => (
+                            <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="p-4">
+                                <span className="block font-semibold text-slate-900">{new Date(tx.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                <span className="block text-[10px] font-mono text-slate-400 mt-0.5">{tx.id}</span>
+                              </td>
+                              <td className="p-4">
+                                <span className="block font-bold text-slate-900 text-sm">{tx.buyerName}</span>
+                                <span className="block text-[11px] text-slate-450 italic mt-0.5">{tx.buyerAddress}</span>
+                              </td>
+                              <td className="p-4 font-black text-slate-900 text-sm">
+                                {formatPrice(tx.payableAmount)}
+                              </td>
+                              <td className="p-4 min-w-[280px]">
+                                <div className="space-y-1.5 max-w-sm">
+                                  {tx.commissions.length === 0 ? (
+                                    <span className="text-slate-400 text-xs italic">Tanpa pembagian komisi</span>
+                                  ) : (
+                                    tx.commissions.map((comm, idx) => (
+                                      <div key={idx} className="text-[11px] bg-slate-50 border border-slate-150 p-2 rounded-lg flex items-center justify-between gap-3 shadow-3xs">
+                                        <div>
+                                          <span className="font-extrabold text-slate-800 block leading-tight">{comm.recipientName}</span>
+                                          <span className="text-[9px] text-slate-450 font-bold uppercase tracking-wider block mt-0.5">{getLevelDisplayName(comm.level)} ({comm.percentage}%)</span>
+                                        </div>
+                                        <span className="text-brand-green font-black text-xs">{formatPrice(comm.amount)}</span>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-4 text-right space-y-2">
+                                <div className="flex justify-end mb-1">
+                                  {tx.status === 'verified' ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-brand-green bg-brand-green/10 px-2.5 py-1 rounded-full border border-brand-green/25 uppercase tracking-widest leading-none">
+                                      <CheckCircle className="w-3 h-3 text-brand-green" /> Lunas Verified
+                                    </span>
+                                  ) : tx.status === 'cancelled' ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-rose-650 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-150 uppercase tracking-widest leading-none">
+                                      <XCircle className="w-3 h-3 text-rose-500" /> Dibatalkan
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-150 uppercase tracking-widest leading-none">
+                                      <Clock className="w-3 h-3 text-amber-500 animate-pulse" /> Pending Bayar
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex justify-end gap-1.5">
+                                  {tx.status === 'pending' && (
+                                    <button
+                                      onClick={() => handleVerifyTxPayment(tx.id)}
+                                      className="px-2 py-1.5 bg-brand-green hover:bg-brand-green/95 text-white font-extrabold text-[10px] rounded-lg cursor-pointer shadow-3xs transition-all"
+                                    >
+                                      Selesaikan / Lunas
+                                    </button>
+                                  )}
+                                  {tx.status === 'pending' && (
+                                    <button
+                                      onClick={() => handleCancelTxPayment(tx.id)}
+                                      className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-[10px] border border-rose-150 rounded-lg cursor-pointer transition-all"
+                                    >
+                                      Batalkan
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteTx(tx.id)}
+                                    className="px-2 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-700 font-extrabold text-[10px] rounded-lg cursor-pointer transition-all"
+                                  >
+                                    Hapus
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </main>

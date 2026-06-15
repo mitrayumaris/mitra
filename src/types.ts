@@ -60,6 +60,7 @@ export interface CommissionSplit {
 
 export interface Transaction {
   id: string;
+  type?: 'regular' | 'spp';
   buyerName: string;
   buyerPhone: string;
   buyerAddress: string;

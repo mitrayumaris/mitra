@@ -859,6 +859,103 @@ export const DataService = {
     return newTx;
   },
 
+  async createSppTransaction(data: {
+    studentName: string;
+    sppMonth: string;
+    amount: number;
+    referrerId: string;
+    status: 'pending' | 'verified';
+    notes?: string;
+  }): Promise<Transaction> {
+    const accounts = this.getAccounts();
+    const transactions = this.getTransactions();
+
+    const referrerAccount = accounts.find(a => a.id === data.referrerId);
+
+    // Multi-level commissions calculation
+    const commissions: CommissionSplit[] = [];
+    
+    if (referrerAccount) {
+      // Build the upward referral chain (e.g. [Subagen, Agen, Mitra, Induk, Konsultan])
+      const chain: Account[] = [];
+      let current: Account | undefined = referrerAccount;
+      const visited = new Set<string>();
+      while (current) {
+        if (visited.has(current.id)) {
+          console.warn("Circular reference detected in referral chain:", current.id);
+          break;
+        }
+        visited.add(current.id);
+        if (current.level !== 'admin') {
+          chain.push(current);
+        }
+        if (current.parentId && current.parentId !== current.id) {
+          current = accounts.find(a => a.id === current?.parentId);
+        } else {
+          current = undefined;
+        }
+      }
+
+      // Calculate commissions based on the rate difference of consecutive levels in the chain
+      for (let i = 0; i < chain.length; i++) {
+        const item = chain[i];
+        let cleanPercent = item.commissionPercent;
+
+        if (i > 0) {
+          // Subtract the rate of the preceding level below it
+          cleanPercent = Math.max(0, item.commissionPercent - chain[i - 1].commissionPercent);
+        }
+
+        const commissionAmount = Math.round((cleanPercent / 100) * data.amount);
+
+        commissions.push({
+          recipientId: item.id,
+          recipientName: item.name,
+          level: item.level,
+          amount: commissionAmount,
+          percentage: cleanPercent
+        });
+      }
+    }
+
+    const newTx: Transaction = {
+      id: 'tx-spp-' + Date.now(),
+      type: 'spp',
+      buyerName: `${data.studentName} (SPP - ${data.sppMonth})`,
+      buyerPhone: referrerAccount?.phone || '',
+      buyerAddress: data.notes || 'Pembayaran SPP Bulanan',
+      products: [
+        {
+          productId: 'spp-bulanan',
+          productName: `SPP Bulanan - ${data.sppMonth}`,
+          regFee: 0,
+          monthlyFee: data.amount,
+          quantity: 1
+        }
+      ],
+      totalPrice: data.amount,
+      discountAmount: 0,
+      payableAmount: data.amount,
+      referralCodeUsed: referrerAccount?.referralCode || '',
+      referrerId: data.referrerId,
+      commissions,
+      status: data.status,
+      createdAt: new Date().toISOString()
+    };
+
+    transactions.unshift(newTx);
+    cacheTransactions = [...transactions];
+    setStored(KEYS.TRANSACTIONS, cacheTransactions);
+    notifyListeners();
+
+    try {
+      await setDoc(doc(db, 'transactions', newTx.id), cleanUndefined(newTx));
+    } catch (e) {
+      console.error("Firebase createSppTransaction error:", e);
+    }
+    return newTx;
+  },
+
   async verifyTransactionPayment(id: string): Promise<void> {
     const list = this.getTransactions();
     const idx = list.findIndex(tx => tx.id === id);
