@@ -88,6 +88,13 @@ export default function App() {
   }, []);
 
   const handleGoogleSuccess = (email: string, name: string) => {
+    const normalizedEmail = email.toLowerCase().trim();
+    if (normalizedEmail !== 'onikediri@gmail.com' && normalizedEmail !== 'admin@tahfidzcoding.com') {
+      setLoginError(`AKSES DITOLAK: Akun Google Anda (${email}) tidak terdaftar sebagai Pemilik Sah.`);
+      setShowGoogleAccounts(true);
+      return;
+    }
+
     const accounts = DataService.getAccounts();
     const adminAcc = accounts.find(a => a.level === 'admin') || {
       id: 'admin-1',
@@ -126,8 +133,7 @@ export default function App() {
       }
     } catch (e: any) {
       console.error("Popup login error", e);
-      // Fallback with visual selection menu and guidance
-      setLoginError('Sambungan Google popup terhalang iFrame Sandbox / browser security. Silakan pilih salah satu simulasi profil di bawah.');
+      setLoginError('Sambungan Google popup terhalang iFrame Sandbox / browser security. Silakan buka aplikasi di Tab Baru (klik tombol di kanan atas) lalu gunakan Akun Google Pemilik asli.');
       setShowGoogleAccounts(true);
     }
   };
@@ -404,86 +410,42 @@ export default function App() {
                 )}
 
                 {showGoogleAccounts ? (
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     <div className="text-center pb-2">
-                      <div className="inline-flex p-3 bg-slate-50 border border-slate-150 rounded-full mb-2">
-                        <svg className="w-8 h-8" viewBox="0 0 24 24">
-                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fillRule="evenodd" />
-                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      <div className="inline-flex p-3 bg-red-50 border border-red-200 rounded-full mb-2">
+                        <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                         </svg>
                       </div>
                       <h5 className="font-extrabold text-slate-900 text-sm">Masuk via Google SSO</h5>
-                      <p className="text-xs text-slate-400 mt-0.5">Verifikasi Instan Akun Pemilik Portal</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Sistem Verifikasi Pemilik Portal</p>
                     </div>
 
-                    <div className="space-y-3">
-                      {/* Principal Owner Google Acc */}
-                      <button
-                        type="button"
-                        onClick={() => handleGoogleSuccess('onikediri@gmail.com', 'Ustadz Owner (onikediri)')}
-                        className="w-full p-4 border border-slate-200 hover:border-brand-green/30 hover:bg-slate-50/50 rounded-2xl text-left transition-all flex items-center justify-between group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-emerald-100 text-brand-green font-black rounded-xl flex items-center justify-center text-sm shadow-inner group-hover:scale-105 transition-transform">
-                            O
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-xs text-slate-800">onikediri@gmail.com</p>
-                            <p className="text-[10px] text-brand-green font-bold mt-0.5">Akun Google Pemilik (Utama)</p>
-                          </div>
-                        </div>
-                        <span className="text-[9px] bg-brand-green/10 text-brand-green font-extrabold px-2 py-1 rounded-lg border border-brand-green/10 uppercase group-hover:bg-brand-green group-hover:text-white transition-all">PILIH</span>
-                      </button>
+                    <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-2xl space-y-2.5 text-xs leading-relaxed font-semibold">
+                      <p className="font-extrabold text-amber-950 uppercase tracking-wider flex items-center gap-1">
+                        🛡️ Akses Bypass Simulasi Dinonaktifkan
+                      </p>
+                      <p>
+                        Demi menjamin keamanan data dan memenuhi permintaan pemilik, sistem **tasis telah menghapus seluruh opsi bypass**, tiruan profil, maupun input manual tanpa login pihak ketiga.
+                      </p>
+                      <p>
+                        Akses halaman pemilik **hanya diizinkan** melalui otentikasi Google asli yang divalidasi langsung oleh server Google secara live.
+                      </p>
+                      <div className="bg-amber-100/50 p-2.5 rounded-lg text-[11px] space-y-1 text-amber-900 border border-amber-250">
+                        <p className="font-black text-amber-950">Email Pemilik yang Sah (Whitelist):</p>
+                        <ul className="list-disc list-inside font-mono text-amber-950">
+                          <li>onikediri@gmail.com</li>
+                          <li>admin@tahfidzcoding.com</li>
+                        </ul>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-normal">
+                        *Catatan: Jika login popup di iFrame Sandbox browser Anda gagal/terblokir, silakan klik tombol **&quot;Open in new window / Buka di Tab Baru&quot;** di kanan atas browser agar sesi pop-up SSO Google asli Anda terotentikasi sempurna.
+                      </p>
+                    </div>
 
-                      {/* Alternate Owner Account */}
-                      <button
-                        type="button"
-                        onClick={() => handleGoogleSuccess('admin@tahfidzcoding.com', 'Admin Pusat')}
-                        className="w-full p-4 border border-slate-200 hover:border-brand-green/30 hover:bg-slate-50/50 rounded-2xl text-left transition-all flex items-center justify-between group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-amber-100 text-amber-700 font-extrabold rounded-xl flex items-center justify-center text-sm shadow-inner group-hover:scale-105 transition-transform">
-                            A
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-xs text-slate-800">admin@tahfidzcoding.com</p>
-                            <p className="text-[10px] text-slate-400 font-medium mt-0.5">Email Cadangan Admin Pusat</p>
-                          </div>
-                        </div>
-                        <span className="text-[9px] bg-slate-100 text-slate-500 font-extrabold px-2 py-1 rounded-lg border border-slate-150 uppercase group-hover:bg-brand-green group-hover:text-white transition-all">PILIH</span>
-                      </button>
-
+                    <div className="space-y-3 pt-1">
                       {/* Google Button integration placeholder */}
                       <div id="gsi-button-container" className="flex justify-center w-full"></div>
-
-                      {/* Custom google email input selector */}
-                      <div className="p-4 border border-slate-200 rounded-2xl bg-slate-50/30 space-y-2.5">
-                        <span className="text-[10px] font-extrabold text-slate-450 uppercase block tracking-wider">Gunakan Akun Google Lain</span>
-                        <div className="flex gap-2">
-                          <input
-                            type="email"
-                            placeholder="Contoh: ustadz.baru@gmail.com"
-                            value={customGoogleEmail}
-                            onChange={e => setCustomGoogleEmail(e.target.value)}
-                            className="flex-grow px-3 py-2 border border-slate-200 bg-white text-slate-850 rounded-xl text-xs outline-none focus:border-brand-green"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (customGoogleEmail.includes('@')) {
-                                handleGoogleSuccess(customGoogleEmail, customGoogleEmail.split('@')[0]);
-                              } else {
-                                alert('Harap masukkan alamat email Google yang valid!');
-                              }
-                            }}
-                            className="bg-brand-green hover:bg-brand-green/95 text-white text-xs font-black px-4 py-2 rounded-xl cursor-pointer shadow-sm transition-colors"
-                          >
-                            Masuk
-                          </button>
-                        </div>
-                      </div>
                     </div>
 
                     <button
