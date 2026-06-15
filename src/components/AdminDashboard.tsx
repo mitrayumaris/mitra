@@ -1304,28 +1304,14 @@ export default function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Periode Bulan SPP</label>
-                        <select
+                        <input
+                          required
+                          type="text"
                           value={sppMonth}
                           onChange={e => setSppMonth(e.target.value)}
-                          className="w-full px-4 py-3 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl outline-none focus:border-brand-green"
-                        >
-                          {(() => {
-                            const result = [];
-                            const d = new Date();
-                            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-                            const year = d.getFullYear();
-                            // Generate last 6 months and next 6 months for selection
-                            for (let i = -6; i <= 6; i++) {
-                              const tempDate = new Date(year, d.getMonth() + i, 1);
-                              const mName = months[tempDate.getMonth()];
-                              const yVal = tempDate.getFullYear();
-                              result.push(`${mName} ${yVal}`);
-                            }
-                            return result.map(m => (
-                              <option key={m} value={m}>{m}</option>
-                            ));
-                          })()}
-                        </select>
+                          placeholder="Contoh: Juni 2026"
+                          className="w-full px-4 py-3 border border-slate-200 bg-white text-slate-800 text-sm rounded-xl outline-none focus:border-brand-green focus:ring-1 focus:ring-brand-green/20"
+                        />
                       </div>
 
                       <div className="space-y-1">
