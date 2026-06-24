@@ -614,9 +614,9 @@ export default function LandingPage({ onLoginClick }: LandingPageProps) {
                     {/* Referral Engine */}
                     <div className="p-4 bg-brand-green/5 border border-brand-green/10 rounded-xl space-y-3">
                       <label className="text-xs font-bold text-brand-green flex items-center gap-1.5 leading-none">
-                        <Tag className="w-3.5 h-3.5 text-brand-yellow" /> GABUNG KODE REFERRAL MITRA (Diskon Langsung)
+                        <Tag className="w-3.5 h-3.5 text-brand-yellow" /> MASUKKAN KODE DISKON
                       </label>
-                      <p className="text-xs text-brand-green/85 leading-relaxed">Punya kode referral dari Mitra, Sub-Mitra, atau Agen kami? Masukkan untuk memperoleh potongan langsung sesuai dengan nilai diskon produk yang di-input oleh admin.</p>
+                      <p className="text-xs text-brand-green/85 leading-relaxed">Untuk mendapatkan potongan khusus</p>
                       
                       <div className="flex gap-2">
                         <input
